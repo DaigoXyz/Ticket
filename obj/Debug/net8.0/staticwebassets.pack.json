@@ -1,0 +1,41 @@
+{
+  "Files": [
+    {
+      "Id": "D:\\BentangTest\\Ticket\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\Ticket.bundle.scp.css",
+      "PackagePath": "staticwebassets\\Ticket.bundle.scp.css"
+    },
+    {
+      "Id": "D:\\BentangTest\\Ticket\\wwwroot\\app.css",
+      "PackagePath": "staticwebassets\\app.css"
+    },
+    {
+      "Id": "D:\\BentangTest\\Ticket\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css"
+    },
+    {
+      "Id": "D:\\BentangTest\\Ticket\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css.map"
+    },
+    {
+      "Id": "D:\\BentangTest\\Ticket\\wwwroot\\favicon.png",
+      "PackagePath": "staticwebassets\\favicon.png"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.Ticket.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.Ticket.props",
+      "PackagePath": "build\\Ticket.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.Ticket.props",
+      "PackagePath": "buildMultiTargeting\\Ticket.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.Ticket.props",
+      "PackagePath": "buildTransitive\\Ticket.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

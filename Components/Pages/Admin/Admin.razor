@@ -1,0 +1,506 @@
+@page "/admin"
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject IUserRepository UserRepo
+@inject IEntryTicketRepository TicketRepo
+@inject Ticket.Services.State.AuthState State
+@using Ticket.Models
+@using Ticket.Repositories.IRepositories
+
+<div class="container-fluid mt-4">
+    @if (_checkingAuth)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Checking access...</span>
+            </div>
+        </div>
+    }
+    else if (!_isAdmin)
+    {
+        <div class="alert alert-warning">
+            <h4 class="alert-heading">Access Denied</h4>
+            <p>Role: <strong>@_currentRole</strong></p>
+            <p class="mb-0">Redirecting to dashboard...</p>
+        </div>
+    }
+    else
+    {
+        <div class="row mb-4">
+            <div class="col">
+                <h2>Admin Dashboard</h2>
+                <p class="text-muted">Selamat datang, @_currentUsername</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary" @onclick="LoadAdminData">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger">
+                <strong>Error:</strong> @_error
+            </div>
+        }
+        else
+        {
+            <!-- Statistics Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-1">Total Users</h6>
+                                    <h3 class="mb-0 fw-bold">@_totalUsers</h3>
+                                    <small class="text-success">
+                                        <i class="bi bi-arrow-up"></i> @_activeUsers Active
+                                    </small>
+                                </div>
+                                <div class="bg-primary bg-opacity-10 p-3 rounded">
+                                    <i class="bi bi-people-fill fs-2 text-primary"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-1">Total Tickets</h6>
+                                    <h3 class="mb-0 fw-bold">@_totalTickets</h3>
+                                    <small class="text-info">All time</small>
+                                </div>
+                                <div class="bg-info bg-opacity-10 p-3 rounded">
+                                    <i class="bi bi-ticket-perforated-fill fs-2 text-info"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-1">Booked Tickets</h6>
+                                    <h3 class="mb-0 fw-bold">@_bookedTickets</h3>
+                                    <small class="text-warning">Pending check-in</small>
+                                </div>
+                                <div class="bg-warning bg-opacity-10 p-3 rounded">
+                                    <i class="bi bi-calendar-check-fill fs-2 text-warning"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-1">Checked In</h6>
+                                    <h3 class="mb-0 fw-bold">@_checkedInTickets</h3>
+                                    <small class="text-success">Today: @_todayCheckIns</small>
+                                </div>
+                                <div class="bg-success bg-opacity-10 p-3 rounded">
+                                    <i class="bi bi-door-open-fill fs-2 text-success"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row g-3 mb-4">
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0">Ticket Trends (Last 7 Days)</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="ticketTrendsChart" height="80"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0">Ticket Status</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="statusPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Tickets Table -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0">Recent Tickets</h5>
+                </div>
+                <div class="card-body">
+                    @if (_recentTickets.Count == 0)
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+                            <p class="text-muted mt-2">No tickets found</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Visitor</th>
+                                        <th>Visit Date</th>
+                                        <th>Purpose</th>
+                                        <th>Status</th>
+                                        <th>Check-In Time</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var t in _recentTickets)
+                                    {
+                                        <tr>
+                                            <td><strong>#@t.Id</strong></td>
+                                            <td>@t.User?.Name</td>
+                                            <td>@t.VisitDate.ToString("dd MMM yyyy")</td>
+                                            <td>@(string.IsNullOrEmpty(t.Purpose) ? "-" : t.Purpose)</td>
+                                            <td>
+                                                @if (t.Status == "Booked")
+                                                {
+                                                    <span class="badge bg-warning">Booked</span>
+                                                }
+                                                else if (t.Status == "CheckedIn")
+                                                {
+                                                    <span class="badge bg-success">Checked In</span>
+                                                }
+                                                else if (t.Status == "Cancelled")
+                                                {
+                                                    <span class="badge bg-danger">Cancelled</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">@t.Status</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (t.TimeIn.HasValue)
+                                                {
+                                                    @t.TimeIn.Value.ToString("HH:mm")
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>@t.CreatedAt.ToString("dd/MM HH:mm")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- User Statistics -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0">User Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Name</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Total Tickets</th>
+                                    <th>Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in _users)
+                                {
+                                    <tr>
+                                        <td><strong>@user.Id</strong></td>
+                                        <td>@user.Username</td>
+                                        <td>@user.Name</td>
+                                        <td>
+                                            @if (user.Role == "Admin")
+                                            {
+                                                <span class="badge bg-danger">Admin</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-primary">User</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>@_userTicketCounts.GetValueOrDefault(user.Id, 0)</td>
+                                        <td>@user.CreatedAt.ToString("dd MMM yyyy")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private bool _checkingAuth = true;
+    private bool _isAdmin = false;
+    private string _currentRole = "unknown";
+    private string _currentUsername = "unknown";
+
+    private bool _loading = false;
+    private string? _error;
+
+    // Statistics
+    private int _totalUsers = 0;
+    private int _activeUsers = 0;
+    private int _totalTickets = 0;
+    private int _bookedTickets = 0;
+    private int _checkedInTickets = 0;
+    private int _todayCheckIns = 0;
+
+    private List<EntryTickets> _recentTickets = new();
+    private List<Users> _users = new();
+    private Dictionary<int, int> _userTicketCounts = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckAuthAndLoadData();
+        }
+    }
+
+    private async Task CheckAuthAndLoadData()
+    {
+        try
+        {
+            var session = await SessionStorage.GetItemAsync<Users>("currentUser");
+            _currentRole = session?.Role ?? "null";
+            _currentUsername = session?.Username ?? "null";
+
+            _isAdmin = string.Equals(session?.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+            _checkingAuth = false;
+            StateHasChanged();
+
+            if (!_isAdmin)
+            {
+                await Task.Delay(2000);
+                Nav.NavigateTo("/dashboard", true);
+                return;
+            }
+
+            await LoadAdminData();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error: {ex.Message}";
+            _checkingAuth = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAdminData()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // Load users
+            _users = await UserRepo.GetAllAsync() ?? new();
+            _totalUsers = _users.Count;
+            _activeUsers = _users.Count(u => u.IsActive);
+
+            // Load tickets
+            var tickets = await TicketRepo.GetAllAsync() ?? new();
+            _totalTickets = tickets.Count;
+            _bookedTickets = tickets.Count(t => t.Status == "Booked");
+            _checkedInTickets = tickets.Count(t => t.Status == "CheckedIn");
+            _todayCheckIns = tickets.Count(t => t.TimeIn.HasValue && t.TimeIn.Value.Date == DateTime.Now.Date);
+
+            _recentTickets = tickets
+            .OrderByDescending(t => t.CreatedAt)
+            .Take(10)
+            .ToList();
+
+            // Count tickets per user
+            _userTicketCounts = tickets
+            .GroupBy(t => t.UserId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+            _loading = false;
+            StateHasChanged();
+
+            // Render charts after data is loaded
+            await RenderCharts(tickets);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load admin data: {ex.Message}";
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RenderCharts(List<EntryTickets> tickets)
+    {
+        await Task.Delay(100); // Wait for DOM to be ready
+
+        // Prepare data for last 7 days trend
+        var last7Days = Enumerable.Range(0, 7)
+        .Select(i => DateTime.Now.Date.AddDays(-6 + i))
+        .ToList();
+
+        var trendData = last7Days.Select(date => new
+        {
+            Date = date.ToString("dd MMM"),
+            Count = tickets.Count(t => t.CreatedAt.Date == date)
+        }).ToList();
+
+        // Prepare status pie chart data
+        var statusData = new
+        {
+            Booked = tickets.Count(t => t.Status == "Booked"),
+            CheckedIn = tickets.Count(t => t.Status == "CheckedIn"),
+            Cancelled = tickets.Count(t => t.Status == "Cancelled")
+        };
+
+        // Render Trend Chart
+        await JSRuntime.InvokeVoidAsync("renderTrendChart",
+        trendData.Select(d => d.Date).ToArray(),
+        trendData.Select(d => d.Count).ToArray()
+        );
+
+        // Render Pie Chart
+        await JSRuntime.InvokeVoidAsync("renderPieChart",
+        statusData.Booked,
+        statusData.CheckedIn,
+        statusData.Cancelled
+        );
+    }
+}
+
+@inject IJSRuntime JSRuntime
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+    let trendChart = null;
+    let pieChart = null;
+
+    window.renderTrendChart = function (labels, data) {
+        const ctx = document.getElementById('ticketTrendsChart');
+        if (!ctx) return;
+
+        if (trendChart) trendChart.destroy();
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Tickets Created',
+                    data: data,
+                    borderColor: 'rgb(13, 110, 253)',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    window.renderPieChart = function (booked, checkedIn, cancelled) {
+        const ctx = document.getElementById('statusPieChart');
+        if (!ctx) return;
+
+        if (pieChart) pieChart.destroy();
+
+        pieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Booked', 'Checked In', 'Cancelled'],
+                datasets: [{
+                    data: [booked, checkedIn, cancelled],
+                    backgroundColor: [
+                        'rgb(255, 193, 7)',
+                        'rgb(25, 135, 84)',
+                        'rgb(220, 53, 69)'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    };
+</script>

@@ -1,0 +1,337 @@
+@page "/tickets/{Id:int}"
+@rendermode InteractiveServer
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject Ticket.Repositories.IRepositories.IEntryTicketRepository TicketRepo
+@inject NavigationManager Nav
+@using Ticket.Models
+@using Ticket.DTOs.EntryTicket
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="mb-3">
+                <a href="/tickets" class="text-decoration-none">
+                    <i class="bi bi-arrow-left"></i> Kembali ke Daftar Tiket
+                </a>
+            </div>
+
+            @if (loading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (ticket == null)
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Tiket tidak ditemukan atau Anda tidak memiliki akses ke tiket ini.
+                </div>
+            }
+            else
+            {
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">Detail Tiket #@ticket.Id</h4>
+                            @if (ticket.Status == "Booked")
+                            {
+                                <span class="badge bg-success fs-6">Booked</span>
+                            }
+                            else if (ticket.Status == "CheckedIn")
+                            {
+                                <span class="badge bg-info fs-6">Checked In</span>
+                            }
+                            else if (ticket.Status == "Cancelled")
+                            {
+                                <span class="badge bg-danger fs-6">Cancelled</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary fs-6">@ticket.Status</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="border-start border-primary border-4 ps-3">
+                                    <h6 class="text-muted mb-1">Nama Pengunjung</h6>
+                                    <p class="fs-5 mb-0 fw-semibold">@ticket.User.Name</p>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="border-start border-primary border-4 ps-3">
+                                    <h6 class="text-muted mb-1">Tanggal Kunjungan</h6>
+                                    <p class="fs-5 mb-0 fw-semibold">@ticket.VisitDate.ToString("dddd, dd MMMM yyyy")</p>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="border-start border-primary border-4 ps-3">
+                                    <h6 class="text-muted mb-1">Waktu Check-In</h6>
+                                    <p class="fs-5 mb-0 fw-semibold">
+                                        @if (ticket.TimeIn.HasValue)
+                                        {
+                                            @ticket.TimeIn.Value.ToLocalTime().ToString("HH:mm:ss")
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Belum Check-In</span>
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="border-start border-primary border-4 ps-3">
+                                    <h6 class="text-muted mb-1">Tanggal Dibuat</h6>
+                                    <p class="fs-5 mb-0 fw-semibold">@ticket.CreatedAt.ToString("dd MMM yyyy, HH:mm")</p>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="border-start border-primary border-4 ps-3">
+                                    <h6 class="text-muted mb-1">Keperluan</h6>
+                                    <p class="mb-0">
+                                        @if (!string.IsNullOrEmpty(ticket.Purpose))
+                                        {
+                                            @ticket.Purpose
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted fst-italic">Tidak ada keterangan</span>
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (ticket.Status == "Booked" && ticket.VisitDate.Date >= DateTime.Now.Date)
+                        {
+                            <hr class="my-4" />
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Informasi:</strong> Tunjukkan tiket ini saat melakukan check-in di lokasi.
+                            </div>
+                        }
+                        else if (ticket.Status == "CheckedIn")
+                        {
+                            <hr class="my-4" />
+                            <div class="alert alert-success mb-0">
+                                <i class="bi bi-check-circle"></i>
+                                <strong>Check-In Berhasil!</strong> Anda telah melakukan check-in pada
+                                @ticket.TimeIn?.ToLocalTime().ToString("HH:mm").
+                            </div>
+                        }
+                        else if (ticket.VisitDate.Date < DateTime.Now.Date && ticket.Status == "Booked")
+                        {
+                            <hr class="my-4" />
+                            <div class="alert alert-warning mb-0">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Tiket Kedaluwarsa:</strong> Tanggal kunjungan telah lewat.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @if (ticket.Status == "Booked" && ticket.VisitDate.Date >= DateTime.Now.Date)
+                {
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-3">
+                                <i class="bi bi-pencil-square"></i> Aksi
+                            </h6>
+
+                            @if (showEditForm)
+                            {
+                                <EditForm Model="editModel" OnValidSubmit="HandleUpdate">
+                                    <DataAnnotationsValidator />
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Tanggal Kunjungan</label>
+                                        <InputDate class="form-control" @bind-Value="editModel.VisitDate"
+                                            min="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                                        <ValidationMessage For="() => editModel.VisitDate" class="text-danger" />
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Keperluan</label>
+                                        <InputTextArea class="form-control" @bind-Value="editModel.Purpose" rows="3" />
+                                        <ValidationMessage For="() => editModel.Purpose" class="text-danger" />
+                                    </div>
+
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary" disabled="@updating">
+                                            @if (updating)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                            }
+                                            Simpan Perubahan
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            @onclick="() => showEditForm = false">
+                                            Batal
+                                        </button>
+                                    </div>
+                                </EditForm>
+                            }
+                            else
+                            {
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-primary" @onclick="() => showEditForm = true">
+                                        <i class="bi bi-pencil"></i> Edit Tiket
+                                    </button>
+                                    <button class="btn btn-outline-danger" @onclick="ShowCancelConfirm">
+                                        <i class="bi bi-x-circle"></i> Batalkan Tiket
+                                    </button>
+                                </div>
+                            }
+
+                            @if (showCancelConfirm)
+                            {
+                                <div class="alert alert-danger mt-3">
+                                    <p class="mb-2">
+                                        <strong>Yakin ingin membatalkan tiket ini?</strong>
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-danger btn-sm" @onclick="HandleCancel" disabled="@cancelling">
+                                            @if (cancelling)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                            }
+                                            Ya, Batalkan
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => showCancelConfirm = false">
+                                            Tidak
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Users? currentUser;
+    private EntryTickets? ticket;
+    private bool loading = true;
+    private bool showEditForm = false;
+    private bool showCancelConfirm = false;
+    private bool updating = false;
+    private bool cancelling = false;
+    private EntryTicketUpdateDto editModel = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+            
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
+
+            if (currentUser == null)
+            {
+                Nav.NavigateTo("/login", true);
+                return;
+            }
+
+            await LoadTicket();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Tickets page init error: {ex}");
+            // optional: tampilkan error message di UI
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTicket()
+    {
+        ticket = await TicketRepo.GetByIdAsync(Id);
+
+        if (ticket != null && ticket.UserId != currentUser?.Id)
+        {
+            ticket = null;
+            return;
+        }
+
+        if (ticket != null)
+        {
+            editModel.VisitDate = ticket.VisitDate;
+            editModel.Purpose = ticket.Purpose;
+            editModel.Status = ticket.Status;
+        }
+    }
+
+    private void ShowCancelConfirm()
+    {
+        showCancelConfirm = true;
+        showEditForm = false;
+    }
+
+    private async Task HandleUpdate()
+    {
+        updating = true;
+
+        try
+        {
+            if (ticket != null)
+            {
+                ticket.VisitDate = editModel.VisitDate.Date;
+                ticket.Purpose = editModel.Purpose;
+                ticket.Status = editModel.Status;
+
+                await TicketRepo.UpdateAsync(ticket);
+                await TicketRepo.SaveChangesAsync();
+
+                showEditForm = false;
+                await LoadTicket();
+            }
+        }
+        finally
+        {
+            updating = false;
+        }
+    }
+
+    private async Task HandleCancel()
+    {
+        cancelling = true;
+
+        try
+        {
+            if (ticket != null)
+            {
+                ticket.Status = "Cancelled";
+                await TicketRepo.UpdateAsync(ticket);
+                await TicketRepo.SaveChangesAsync();
+
+                await LoadTicket();
+                showCancelConfirm = false;
+            }
+        }
+        finally
+        {
+            cancelling = false;
+        }
+    }
+}

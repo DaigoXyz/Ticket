@@ -1,0 +1,488 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject IUserRepository UserRepo
+@inject IPasswordHash PasswordHasher
+@inject NavigationManager Nav
+@using Ticket.Models
+@using Ticket.Repositories.IRepositories
+@using Ticket.Services.Hash
+@using System.ComponentModel.DataAnnotations
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Manage Users</h2>
+            <p class="text-muted">Kelola data pengguna sistem</p>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-circle"></i> Tambah User
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" placeholder="Cari username atau nama..." @bind="searchTerm"
+                        @bind:event="oninput" @onkeyup="FilterUsers" />
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" @bind="filterRole" @bind:after="FilterUsers">
+                        <option value="">Semua Role</option>
+                        <option value="Admin">Admin</option>
+                        <option value="User">User</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" @bind="filterStatus" @bind:after="FilterUsers">
+                        <option value="">Semua Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary"></div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Nama</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Bergabung</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in filteredUsers)
+                            {
+                                <tr>
+                                    <td><strong>@user.Id</strong></td>
+                                    <td>@user.Username</td>
+                                    <td>@user.Name</td>
+                                    <td>
+                                        @if (user.Role == "Admin")
+                                        {
+                                            <span class="badge bg-danger">Admin</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-primary">User</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (user.IsActive)
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        }
+                                    </td>
+                                    <td>@user.CreatedAt.ToString("dd MMM yyyy")</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(user)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" @onclick="() => ShowDeleteConfirm(user)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (!filteredUsers.Any())
+                {
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox fs-1 text-muted"></i>
+                        <p class="text-muted mt-2">Tidak ada user yang sesuai filter</p>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mt-3 mb-0">
+                        Menampilkan @filteredUsers.Count dari @allUsers.Count users
+                    </p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Create/Edit Modal -->
+@if (showModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(isEditMode ? "Edit User" : "Tambah User")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <EditForm Model="userModel" OnValidSubmit="HandleSave">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Username <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="userModel.Username" disabled="@isEditMode" />
+                            <ValidationMessage For="() => userModel.Username" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Nama <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="userModel.Name" />
+                            <ValidationMessage For="() => userModel.Name" class="text-danger" />
+                        </div>
+
+                        @if (!isEditMode)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Password <span class="text-danger">*</span></label>
+                                <InputText type="password" class="form-control" @bind-Value="userModel.Password" />
+                                <ValidationMessage For="() => userModel.Password" class="text-danger" />
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Role <span class="text-danger">*</span></label>
+                            <InputSelect class="form-select" @bind-Value="userModel.Role">
+                                <option value="User">User</option>
+                                <option value="Admin">Admin</option>
+                            </InputSelect>
+                            <ValidationMessage For="() => userModel.Role" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <InputCheckbox class="form-check-input" id="isActive" @bind-Value="userModel.IsActive" />
+                                <label class="form-check-label" for="isActive">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Batal</button>
+                        <button type="submit" class="btn btn-primary" disabled="@saving">
+                            @if (saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Simpan
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal && userToDelete != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Konfirmasi Hapus</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseDeleteModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Apakah Anda yakin ingin menghapus user ini?</p>
+                    <div class="alert alert-warning">
+                        <strong>Username:</strong> @userToDelete.Username<br />
+                        <strong>Nama:</strong> @userToDelete.Name
+                    </div>
+                    <p class="text-danger mb-0">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Peringatan:</strong> Aksi ini tidak dapat dibatalkan!
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDeleteModal">Batal</button>
+                    <button type="button" class="btn btn-danger" @onclick="HandleDelete" disabled="@deleting">
+                        @if (deleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Ya, Hapus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Users? currentUser;
+    private bool loading = true;
+    private List<Users> allUsers = new();
+    private List<Users> filteredUsers = new();
+    private string searchTerm = string.Empty;
+    private string filterRole = string.Empty;
+    private string filterStatus = string.Empty;
+    private string? successMessage;
+    private string? errorMessage;
+
+    // Modal states
+    private bool showModal = false;
+    private bool showDeleteModal = false;
+    private bool isEditMode = false;
+    private bool saving = false;
+    private bool deleting = false;
+    private UserFormModel userModel = new();
+    private Users? userToDelete;
+    private Users? userToEdit;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
+
+            if (currentUser == null)
+            {
+                Nav.NavigateTo("/login", true);
+                return;
+            }
+
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Tickets page init error: {ex}");
+            // optional: tampilkan error message di UI
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        allUsers = await UserRepo.GetAllAsync() ?? new();
+        filteredUsers = allUsers;
+    }
+
+    private void FilterUsers()
+    {
+        filteredUsers = allUsers;
+
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            filteredUsers = filteredUsers.Where(u =>
+            u.Username.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            u.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+            ).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filterRole))
+        {
+            filteredUsers = filteredUsers.Where(u => u.Role == filterRole).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filterStatus))
+        {
+            bool isActive = filterStatus == "active";
+            filteredUsers = filteredUsers.Where(u => u.IsActive == isActive).ToList();
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        isEditMode = false;
+        userModel = new UserFormModel { IsActive = true, Role = "User" };
+        showModal = true;
+    }
+
+    private void ShowEditModal(Users user)
+    {
+        isEditMode = true;
+        userToEdit = user;
+        userModel = new UserFormModel
+        {
+            Username = user.Username,
+            Name = user.Name,
+            Role = user.Role,
+            IsActive = user.IsActive
+        };
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        userModel = new();
+        userToEdit = null;
+    }
+
+    private async Task HandleSave()
+    {
+        saving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            if (isEditMode && userToEdit != null)
+            {
+                userToEdit.Name = userModel.Name;
+                userToEdit.Role = userModel.Role;
+                userToEdit.IsActive = userModel.IsActive;
+
+                await UserRepo.UpdateAsync(userToEdit);
+                successMessage = "User berhasil diupdate!";
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(userModel.Password) || userModel.Password.Length < 6)
+                {
+                    errorMessage = "Password minimal 6 karakter!";
+                    saving = false;
+                    return;
+                }
+
+                var existingUser = await UserRepo.GetByUsernameAsync(userModel.Username);
+                if (existingUser != null)
+                {
+                    errorMessage = "Username sudah digunakan!";
+                    saving = false;
+                    return;
+                }
+
+                var newUser = new Users
+                {
+                    Username = userModel.Username,
+                    Name = userModel.Name,
+                    PasswordHash = PasswordHasher.Hash(userModel.Password),
+                    Role = userModel.Role,
+                    IsActive = userModel.IsActive,
+                    CreatedAt = DateTime.Now
+                };
+
+                await UserRepo.AddAsync(newUser);
+                successMessage = "User berhasil ditambahkan!";
+            }
+
+            await LoadUsers();
+            FilterUsers();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void ShowDeleteConfirm(Users user)
+    {
+        userToDelete = user;
+        showDeleteModal = true;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        userToDelete = null;
+    }
+
+    private async Task HandleDelete()
+    {
+        if (userToDelete == null) return;
+
+        deleting = true;
+        errorMessage = null;
+
+        try
+        {
+            if (userToDelete.Id == currentUser?.Id)
+            {
+                errorMessage = "Anda tidak dapat menghapus akun Anda sendiri!";
+                deleting = false;
+                return;
+            }
+
+            await UserRepo.DeleteAsync(userToDelete.Id);
+            successMessage = $"User {userToDelete.Username} berhasil dihapus!";
+
+            await LoadUsers();
+            FilterUsers();
+            CloseDeleteModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            deleting = false;
+        }
+    }
+
+    public class UserFormModel
+    {
+        [Required(ErrorMessage = "Username harus diisi")]
+        [StringLength(50, ErrorMessage = "Username maksimal 50 karakter")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Nama harus diisi")]
+        [StringLength(100, ErrorMessage = "Nama maksimal 100 karakter")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Password { get; set; }
+
+        [Required(ErrorMessage = "Role harus dipilih")]
+        public string Role { get; set; } = "User";
+
+        public bool IsActive { get; set; } = true;
+    }
+}

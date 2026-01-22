@@ -1,0 +1,11 @@
+﻿@page "/"
+@inject NavigationManager Nav
+@inject Ticket.Services.State.AuthState State
+
+@code {
+    protected override void OnInitialized()
+    {
+        var targetUrl = State.IsLoggedIn ? "/dashboard" : "/login";
+        Nav.NavigateTo(targetUrl, true);
+    }
+}

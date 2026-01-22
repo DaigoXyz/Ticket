@@ -1,0 +1,177 @@
+@page "/tickets/create"
+@rendermode InteractiveServer
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject Ticket.Repositories.IRepositories.IEntryTicketRepository TicketRepo
+@inject NavigationManager Nav
+@using Ticket.Models
+@using Ticket.DTOs.EntryTicket
+@using System.ComponentModel.DataAnnotations
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="mb-3">
+                <a href="/tickets" class="text-decoration-none">
+                    <i class="bi bi-arrow-left"></i> Kembali ke Daftar Tiket
+                </a>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Buat Tiket Baru</h4>
+                </div>
+                <div class="card-body p-4">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @errorMessage
+                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @successMessage
+                            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                        </div>
+                    }
+
+                    <EditForm Model="model" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Tanggal Kunjungan <span class="text-danger">*</span>
+                            </label>
+                            <InputDate class="form-control" @bind-Value="model.VisitDate" min="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                            <ValidationMessage For="() => model.VisitDate" class="text-danger" />
+                            <div class="form-text">Pilih tanggal kunjungan Anda</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                Keperluan
+                            </label>
+                            <InputTextArea class="form-control" @bind-Value="model.Purpose" 
+                                           rows="4" placeholder="Contoh: Meeting dengan tim IT, Pengambilan dokumen, dll." />
+                            <ValidationMessage For="() => model.Purpose" class="text-danger" />
+                            <div class="form-text">Opsional - jelaskan tujuan kunjungan Anda</div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Catatan:</strong> Tiket akan otomatis berstatus "Booked" setelah dibuat. 
+                            Tunjukkan tiket saat check-in di lokasi.
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@loading">
+                                @if (loading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <span>Menyimpan...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    <span>Buat Tiket</span>
+                                }
+                            </button>
+                            <a href="/tickets" class="btn btn-outline-secondary">Batal</a>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-question-circle"></i> Petunjuk
+                    </h6>
+                    <ul class="mb-0">
+                        <li>Pilih tanggal kunjungan yang sesuai dengan rencana Anda</li>
+                        <li>Isi keperluan kunjungan untuk memudahkan proses verifikasi</li>
+                        <li>Tiket hanya berlaku untuk tanggal yang dipilih</li>
+                        <li>Anda dapat melihat dan mengelola tiket di halaman "Tiket Saya"</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Users? currentUser;
+    private CreateTicketModel model = new();
+    private bool loading = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+            
+        currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
+
+        if (currentUser == null)
+        {
+            Nav.NavigateTo("/login", true);
+            return;
+        }
+
+        model.VisitDate = DateTime.Now.Date.AddDays(1);
+    }
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+        successMessage = null;
+        loading = true;
+
+        try
+        {
+            if (model.VisitDate.Date < DateTime.Now.Date)
+            {
+                errorMessage = "Tanggal kunjungan tidak boleh di masa lalu";
+                loading = false;
+                return;
+            }
+
+            var newTicket = new EntryTickets
+            {
+                UserId = currentUser!.Id,
+                VisitDate = model.VisitDate.Date,
+                Purpose = model.Purpose,
+                Status = "Booked",
+                CreatedAt = DateTime.Now
+            };
+
+            await TicketRepo.AddAsync(newTicket);
+            await TicketRepo.SaveChangesAsync();
+
+            successMessage = "Tiket berhasil dibuat!";
+            
+            await Task.Delay(1500);
+            Nav.NavigateTo("/tickets", true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Terjadi kesalahan: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    public class CreateTicketModel
+    {
+        [Required(ErrorMessage = "Tanggal kunjungan harus diisi")]
+        public DateTime VisitDate { get; set; } = DateTime.Now.Date.AddDays(1);
+
+        [MaxLength(500, ErrorMessage = "Keperluan maksimal 500 karakter")]
+        public string? Purpose { get; set; }
+    }
+}

@@ -1,0 +1,527 @@
+@page "/admin/tickets"
+@rendermode InteractiveServer
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject IEntryTicketRepository TicketRepo
+@inject IUserRepository UserRepo
+@inject NavigationManager Nav
+@using Ticket.Models
+@using Ticket.Repositories.IRepositories
+@using Ticket.DTOs.EntryTicket
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Manage Tickets</h2>
+            <p class="text-muted">Kelola semua tiket kunjungan</p>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-circle"></i> Tambah Ticket
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" placeholder="Cari ticket..." @bind="searchTerm"
+                        @bind:event="oninput" @onkeyup="FilterTickets" />
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" @bind="filterStatus" @bind:after="FilterTickets">
+                        <option value="">Semua Status</option>
+                        <option value="Booked">Booked</option>
+                        <option value="CheckedIn">Checked In</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" class="form-control" @bind="filterDate" @bind:after="FilterTickets" />
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary"></div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Pengunjung</th>
+                                <th>Tanggal Kunjungan</th>
+                                <th>Keperluan</th>
+                                <th>Status</th>
+                                <th>Waktu Check-In</th>
+                                <th>Dibuat</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ticket in filteredTickets)
+                            {
+                                <tr>
+                                    <td><strong>#@ticket.Id</strong></td>
+                                    <td>@ticket.User?.Name</td>
+                                    <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
+                                    <td>@(string.IsNullOrEmpty(ticket.Purpose) ? "-" : ticket.Purpose)</td>
+                                    <td>
+                                        @if (ticket.Status == "Booked")
+                                        {
+                                            <span class="badge bg-warning">Booked</span>
+                                        }
+                                        else if (ticket.Status == "CheckedIn")
+                                        {
+                                            <span class="badge bg-success">Checked In</span>
+                                        }
+                                        else if (ticket.Status == "Cancelled")
+                                        {
+                                            <span class="badge bg-danger">Cancelled</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">@ticket.Status</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (ticket.TimeIn.HasValue)
+                                        {
+                                            @ticket.TimeIn.Value.ToLocalTime().ToString("HH:mm")
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>@ticket.CreatedAt.ToString("dd/MM HH:mm")</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            @if (ticket.Status == "Booked")
+                                            {
+                                                <button class="btn btn-outline-success" @onclick="() => CheckInTicket(ticket)"
+                                                    title="Check In">
+                                                    <i class="bi bi-box-arrow-in-right"></i>
+                                                </button>
+                                            }
+                                            <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(ticket)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" @onclick="() => ShowDeleteConfirm(ticket)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (!filteredTickets.Any())
+                {
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox fs-1 text-muted"></i>
+                        <p class="text-muted mt-2">Tidak ada tiket yang sesuai filter</p>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mt-3 mb-0">
+                        Menampilkan @filteredTickets.Count dari @allTickets.Count tiket
+                    </p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Create/Edit Modal -->
+@if (showModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(isEditMode ? "Edit Ticket" : "Tambah Ticket")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <EditForm Model="ticketModel" OnValidSubmit="HandleSave">
+                    <DataAnnotationsValidator />
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Pengunjung <span class="text-danger">*</span></label>
+                            <InputSelect class="form-select" @bind-Value="ticketModel.UserId" disabled="@isEditMode">
+                                <option value="0">-- Pilih User --</option>
+                                @foreach (var user in users)
+                                {
+                                    <option value="@user.Id">@user.Name (@user.Username)</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => ticketModel.UserId" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tanggal Kunjungan <span class="text-danger">*</span></label>
+                            <InputDate class="form-control" @bind-Value="ticketModel.VisitDate" />
+                            <ValidationMessage For="() => ticketModel.VisitDate" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Keperluan</label>
+                            <InputTextArea class="form-control" @bind-Value="ticketModel.Purpose" rows="3" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Status <span class="text-danger">*</span></label>
+                            <InputSelect class="form-select" @bind-Value="ticketModel.Status">
+                                <option value="Booked">Booked</option>
+                                <option value="CheckedIn">Checked In</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </InputSelect>
+                        </div>
+
+                        @if (ticketModel.Status == "CheckedIn")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Waktu Check-In</label>
+                                <InputDate Type="InputDateType.DateTimeLocal" class="form-control"
+                                    @bind-Value="ticketModel.TimeIn" />
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Batal</button>
+                        <button type="submit" class="btn btn-primary" disabled="@saving">
+                            @if (saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Simpan
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteModal && ticketToDelete != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Konfirmasi Hapus</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseDeleteModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Apakah Anda yakin ingin menghapus tiket ini?</p>
+                    <div class="alert alert-warning">
+                        <strong>ID:</strong> #@ticketToDelete.Id<br />
+                        <strong>Pengunjung:</strong> @ticketToDelete.User?.Name<br />
+                        <strong>Tanggal:</strong> @ticketToDelete.VisitDate.ToString("dd MMM yyyy")
+                    </div>
+                    <p class="text-danger mb-0">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Peringatan:</strong> Aksi ini tidak dapat dibatalkan!
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDeleteModal">Batal</button>
+                    <button type="button" class="btn btn-danger" @onclick="HandleDelete" disabled="@deleting">
+                        @if (deleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Ya, Hapus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Users? currentUser;
+    private bool loading = true;
+    private List<EntryTickets> allTickets = new();
+    private List<EntryTickets> filteredTickets = new();
+    private List<Users> users = new();
+    private string searchTerm = string.Empty;
+    private string filterStatus = string.Empty;
+    private DateTime? filterDate;
+    private string? successMessage;
+    private string? errorMessage;
+
+    // Modal states
+    private bool showModal = false;
+    private bool showDeleteModal = false;
+    private bool isEditMode = false;
+    private bool saving = false;
+    private bool deleting = false;
+    private TicketFormModel ticketModel = new();
+    private EntryTickets? ticketToDelete;
+    private EntryTickets? ticketToEdit;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
+
+            if (currentUser == null)
+            {
+                Nav.NavigateTo("/login", true);
+                return;
+            }
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Tickets page init error: {ex}");
+            // optional: tampilkan error message di UI
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        allTickets = await TicketRepo.GetAllAsync() ?? new();
+        users = await UserRepo.GetAllAsync() ?? new();
+        filteredTickets = allTickets;
+    }
+
+    private void FilterTickets()
+    {
+        filteredTickets = allTickets;
+
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            filteredTickets = filteredTickets.Where(t =>
+            t.Id.ToString().Contains(searchTerm) ||
+            (t.User != null && t.User.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+            (t.Purpose != null && t.Purpose.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filterStatus))
+        {
+            filteredTickets = filteredTickets.Where(t => t.Status == filterStatus).ToList();
+        }
+
+        if (filterDate.HasValue)
+        {
+            filteredTickets = filteredTickets.Where(t => t.VisitDate.Date == filterDate.Value.Date).ToList();
+        }
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        filterStatus = string.Empty;
+        filterDate = null;
+        FilterTickets();
+    }
+
+    private void ShowCreateModal()
+    {
+        isEditMode = false;
+        ticketModel = new TicketFormModel
+        {
+            VisitDate = DateTime.Now.Date.AddDays(1),
+            Status = "Booked"
+        };
+        showModal = true;
+    }
+
+    private void ShowEditModal(EntryTickets ticket)
+    {
+        isEditMode = true;
+        ticketToEdit = ticket;
+        ticketModel = new TicketFormModel
+        {
+            UserId = ticket.UserId,
+            VisitDate = ticket.VisitDate,
+            Purpose = ticket.Purpose,
+            Status = ticket.Status,
+            TimeIn = ticket.TimeIn
+        };
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        ticketModel = new();
+        ticketToEdit = null;
+    }
+
+    private async Task HandleSave()
+    {
+        saving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            if (isEditMode && ticketToEdit != null)
+            {
+                ticketToEdit.VisitDate = ticketModel.VisitDate;
+                ticketToEdit.Purpose = ticketModel.Purpose;
+                ticketToEdit.Status = ticketModel.Status;
+                ticketToEdit.TimeIn = ticketModel.Status == "CheckedIn" ? ticketModel.TimeIn : null;
+
+                await TicketRepo.UpdateAsync(ticketToEdit);
+                await TicketRepo.SaveChangesAsync();
+                successMessage = "Ticket berhasil diupdate!";
+            }
+            else
+            {
+                var newTicket = new EntryTickets
+                {
+                    UserId = ticketModel.UserId,
+                    VisitDate = ticketModel.VisitDate,
+                    Purpose = ticketModel.Purpose,
+                    Status = ticketModel.Status,
+                    TimeIn = ticketModel.Status == "CheckedIn" ? ticketModel.TimeIn : null,
+                    CreatedAt = DateTime.Now
+                };
+
+                await TicketRepo.AddAsync(newTicket);
+                await TicketRepo.SaveChangesAsync();
+                successMessage = "Ticket berhasil ditambahkan!";
+            }
+
+            await LoadData();
+            FilterTickets();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task CheckInTicket(EntryTickets ticket)
+    {
+        try
+        {
+            ticket.Status = "CheckedIn";
+            ticket.TimeIn = DateTime.Now;
+
+            await TicketRepo.UpdateAsync(ticket);
+            await TicketRepo.SaveChangesAsync();
+
+            successMessage = $"Ticket #{ticket.Id} berhasil di-check in!";
+
+            await LoadData();
+            FilterTickets();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void ShowDeleteConfirm(EntryTickets ticket)
+    {
+        ticketToDelete = ticket;
+        showDeleteModal = true;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        ticketToDelete = null;
+    }
+
+    private async Task HandleDelete()
+    {
+        if (ticketToDelete == null) return;
+
+        deleting = true;
+        errorMessage = null;
+
+        try
+        {
+            await TicketRepo.DeleteAsync(ticketToDelete.Id);
+            await TicketRepo.SaveChangesAsync();
+            successMessage = $"Ticket #{ticketToDelete.Id} berhasil dihapus!";
+
+            await LoadData();
+            FilterTickets();
+            CloseDeleteModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            deleting = false;
+        }
+    }
+
+    public class TicketFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue, ErrorMessage = "Pilih pengunjung")]
+        public int UserId { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Tanggal kunjungan harus diisi")]
+        public DateTime VisitDate { get; set; }
+
+        public string? Purpose { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Status harus dipilih")]
+        public string Status { get; set; } = "Booked";
+
+        public DateTime? TimeIn { get; set; }
+    }
+}

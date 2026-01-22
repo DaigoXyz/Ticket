@@ -1,0 +1,137 @@
+﻿@using Ticket.Services.State
+@using Ticket.Models
+@inject AuthState State
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject NavigationManager Nav
+@implements IDisposable
+
+<div class="sidebar-container @(collapseNavMenu ? "collapsed" : "expanded")">
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div class="brand-container">
+            <div class="brand-icon">
+                <i class="bi bi-ticket-perforated"></i>
+            </div>
+            @if (!collapseNavMenu)
+            {
+                <div class="brand-text">
+                    <h6 class="brand-title">Ticket Entry App</h6>
+                    <small class="brand-subtitle">We Provide, You Use</small>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav-menu @(collapseNavMenu ? "collapsed" : "")">
+        <div class="nav-links">
+
+            @if (currentUser != null && string.Equals(currentUser.Role, "User", StringComparison.OrdinalIgnoreCase))
+            {
+                <NavLink class="sidebar-link" href="/dashboard" Match="NavLinkMatch.All">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-text">Dashboard</span>
+                </NavLink>
+
+                <NavLink class="sidebar-link" href="/tickets" Match="NavLinkMatch.Prefix">
+                    <i class="bi bi-ticket-perforated"></i>
+                    <span class="nav-text">My Tickets</span>
+                </NavLink>
+
+                <NavLink class="sidebar-link" href="/profile" Match="NavLinkMatch.All">
+                    <i class="bi bi-person-circle"></i>
+                    <span class="nav-text">Profile</span>
+                </NavLink>
+            }
+
+            @if (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                @if (!collapseNavMenu)
+                {
+                    <div class="menu-section">
+                        <span class="section-label">Admin Panel</span>
+                    </div>
+                }
+
+                <NavLink class="sidebar-link" href="/admin" Match="NavLinkMatch.All">
+                    <i class="bi bi-house-door"></i>
+                    <span class="nav-text">Dashboard</span>
+                </NavLink>
+
+                <NavLink class="sidebar-link" href="/admin/users" Match="NavLinkMatch.All">
+                    <i class="bi bi-people-fill"></i>
+                    <span class="nav-text">Manage Users</span>
+                </NavLink>
+
+                <NavLink class="sidebar-link" href="/admin/tickets" Match="NavLinkMatch.All">
+                    <i class="bi bi-kanban"></i>
+                    <span class="nav-text">Manage Tickets</span>
+                </NavLink>
+            }
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = false;
+    private Users? currentUser;
+    private bool _loadedFromSession = false;
+
+    protected override void OnInitialized()
+    {
+        // Aman saat prerender: pakai State dulu (tidak pakai JS)
+        currentUser = State.CurrentUser;
+
+        // Optional: rerender kalau route berubah (biar active state ke-refresh)
+        Nav.LocationChanged += OnLocationChanged;
+
+        // Optional (bagus): rerender kalau auth berubah
+        State.OnChange += OnAuthChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _loadedFromSession)
+            return;
+
+        // Di sini baru aman panggil JS interop (SessionStorage)
+        try
+        {
+            var u = await SessionStorage.GetItemAsync<Users>("currentUser");
+            if (u != null)
+            {
+                currentUser = u;
+
+                // sinkron ke AuthState biar topbar/sidebar konsisten
+                if (State.CurrentUser == null)
+                    State.SetUser(u);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading user (after render): {ex.Message}");
+        }
+        finally
+        {
+            _loadedFromSession = true;
+            StateHasChanged();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    => InvokeAsync(StateHasChanged);
+
+    private void OnAuthChanged()
+    {
+        currentUser = State.CurrentUser;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        State.OnChange -= OnAuthChanged;
+    }
+}

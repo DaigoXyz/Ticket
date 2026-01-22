@@ -1,0 +1,77 @@
+@page "/logout"
+@rendermode InteractiveServer
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject Ticket.Services.State.AuthState State
+@inject NavigationManager Nav
+
+@if (_isLoggingOut)
+{
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 class="card-title">Logging out...</h5>
+                        <p class="card-text">Please wait while we sign you out.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger mt-3">
+        <h5>Error during logout</h5>
+        <p>@_error</p>
+        <a href="/" class="btn btn-primary">Go to Home</a>
+    </div>
+}
+
+@code {
+    private bool _isLoggingOut = true;
+    private string? _error;
+    private bool _firstRender = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _firstRender)
+        {
+            _firstRender = false;
+            await PerformLogout();
+        }
+    }
+
+    private async Task PerformLogout()
+    {
+        Console.WriteLine("=== LOGOUT PAGE - PERFORMING LOGOUT ===");
+
+        try
+        {
+            // 1. Clear session storage
+            await SessionStorage.RemoveItemAsync("currentUser");
+            Console.WriteLine("✅ SessionStorage cleared");
+
+            // 2. Clear AuthState
+            State.Logout();
+            Console.WriteLine("✅ AuthState cleared");
+
+            // 3. Small delay for UX
+            await Task.Delay(1000);
+
+            // 4. Redirect to login
+            Console.WriteLine("🔄 Redirecting to login...");
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _isLoggingOut = false;
+            Console.WriteLine($"❌ Logout error: {ex.Message}");
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,175 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject Ticket.Services.State.AuthState State
+@inject NavigationManager Nav
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@using Ticket.Models
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4" style="background: #f8f9fa; border-bottom: 1px solid #dee2e6; min-height: 60px;">
+            @if (_currentUser != null)
+            {
+                <div class="d-flex align-items-center">
+                    <span class="me-3" style="font-weight: 500;">
+                        <i class="bi bi-person-fill"></i>
+                        @_currentUser.Username
+                        <small class="text-muted">(@_currentUser.Role)</small>
+                    </span>
+
+                    <a href="/logout" class="btn btn-sm btn-outline-danger" onclick="return confirm('Logout?')">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="text-muted">
+                    <i class="bi bi-person-x"></i> Not logged in |
+                    <a href="/login" class="btn btn-sm btn-primary">Login</a>
+                </div>
+            }
+        </div>
+
+        <!-- Logout Confirmation Modal -->
+        @if (_showConfirmation)
+        {
+            <div class="modal-backdrop fade show" style="z-index: 1040;"></div>
+            <div class="modal fade show d-block" style="z-index: 1050;">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirm Logout</h5>
+                        </div>
+                        <div class="modal-body">
+                            Are you sure you want to logout?
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary"
+                                @onclick="HideLogoutConfirmation">Cancel</button>
+                            <button type="button" class="btn btn-danger" @onclick="PerformLogout">Yes, Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private bool _showConfirmation = false;
+    private bool _isInitialized = false;
+    private Users? _currentUser;
+
+    protected override void OnInitialized()
+    {
+        Console.WriteLine("MainLayout.OnInitialized");
+        _currentUser = State.CurrentUser;
+
+        // Subscribe to changes
+        State.OnChange += OnAuthStateChanged; // Jika pakai Action event
+                                              // Atau: State.PropertyChanged += OnAuthStateChanged; // Jika pakai INotifyPropertyChanged
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isInitialized = true;
+            Console.WriteLine("MainLayout.OnAfterRenderAsync - firstRender");
+
+            // Load user from session storage
+            try
+            {
+                var sessionUser = await SessionStorage.GetItemAsync<Users>("currentUser");
+                Console.WriteLine($"Session user found: {sessionUser?.Username ?? "null"}");
+
+                if (sessionUser != null && State.CurrentUser == null)
+                {
+                    Console.WriteLine($"Setting AuthState from session: {sessionUser.Username}");
+                    State.SetUser(sessionUser);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Session load error: {ex.Message}");
+            }
+        }
+    }
+
+    private void OnAuthStateChanged()
+    {
+        Console.WriteLine($"AuthState changed - New user: {State.CurrentUser?.Username ?? "null"}");
+        _currentUser = State.CurrentUser;
+        StateHasChanged(); // Trigger UI update
+    }
+
+    private void ShowLogoutConfirmation()
+    {
+        if (!_isInitialized) return;
+        _showConfirmation = true;
+        StateHasChanged();
+    }
+
+    private void HideLogoutConfirmation()
+    {
+        _showConfirmation = false;
+        StateHasChanged();
+    }
+
+    private async Task PerformLogout()
+    {
+        if (!_isInitialized) return;
+
+        Console.WriteLine("=== PERFORMING LOGOUT ===");
+
+        try
+        {
+            // Clear session storage
+            await SessionStorage.RemoveItemAsync("currentUser");
+            Console.WriteLine("SessionStorage cleared");
+
+            // Clear AuthState
+            State.Logout();
+            Console.WriteLine("AuthState cleared");
+
+            // Hide modal
+            _showConfirmation = false;
+
+            // Force UI update
+            _currentUser = null;
+            StateHasChanged();
+            await Task.Delay(100);
+
+            // Navigate to login
+            Console.WriteLine("Redirecting to login...");
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Logout error: {ex.Message}");
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+
+    public void Dispose()
+    {
+        Console.WriteLine("MainLayout.Dispose");
+        State.OnChange -= OnAuthStateChanged;
+        // Atau: State.PropertyChanged -= OnAuthStateChanged;
+    }
+}
