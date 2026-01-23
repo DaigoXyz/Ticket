@@ -53,7 +53,7 @@ namespace Ticket.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("EntryTickets");
+                    b.ToTable("EntryTickets", (string)null);
                 });
 
             modelBuilder.Entity("Ticket.Models.Users", b =>
@@ -88,7 +88,7 @@ namespace Ticket.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Ticket.Models.EntryTickets", b =>

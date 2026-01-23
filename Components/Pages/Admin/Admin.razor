@@ -210,14 +210,14 @@
                                             <td>
                                                 @if (t.TimeIn.HasValue)
                                                 {
-                                                    @t.TimeIn.Value.ToString("HH:mm")
+                                                    @t.TimeIn.Value.ToLocalTime().ToString("HH:mm")
                                                 }
                                                 else
                                                 {
                                                     <span class="text-muted">-</span>
                                                 }
                                             </td>
-                                            <td>@t.CreatedAt.ToString("dd/MM HH:mm")</td>
+                                            <td>@t.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
                                         </tr>
                                     }
                                 </tbody>

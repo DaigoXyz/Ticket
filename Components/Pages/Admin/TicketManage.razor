@@ -117,14 +117,14 @@
                                     <td>
                                         @if (ticket.TimeIn.HasValue)
                                         {
-                                            @ticket.TimeIn.Value.ToString("HH:mm")
+                                            @ticket.TimeIn.Value.ToLocalTime().ToString("HH:mm")
                                         }
                                         else
                                         {
                                             <span class="text-muted">-</span>
                                         }
                                     </td>
-                                    <td>@ticket.CreatedAt.ToString("dd/MM HH:mm")</td>
+                                    <td>@ticket.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             @if (ticket.Status == "Booked")

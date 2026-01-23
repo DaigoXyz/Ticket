@@ -142,3 +142,4 @@ D:\BentangTest\Ticket\obj\Debug\net8.0\refint\Ticket.dll
 D:\BentangTest\Ticket\obj\Debug\net8.0\Ticket.pdb
 D:\BentangTest\Ticket\obj\Debug\net8.0\Ticket.genruntimeconfig.cache
 D:\BentangTest\Ticket\obj\Debug\net8.0\ref\Ticket.dll
+D:\BentangTest\Ticket\obj\Debug\net8.0\Ticket.sourcelink.json
