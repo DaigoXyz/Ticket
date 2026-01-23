@@ -240,24 +240,6 @@ http://localhost:5182
 
 ---
 
-# ⚠️ Penting Sebelum Upload ke Git
-
-### 🔒 Jangan upload ini:
-
-Tambahkan ke `.gitignore`:
-
-```
-appsettings.json
-.env
-```
-
-Atau pakai:
-
-* `appsettings.Development.json`
-* environment variables
-
----
-
 # ✅ Notes
 
 * `docker compose down -v` ➜ **hapus database**
