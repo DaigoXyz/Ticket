@@ -55,7 +55,6 @@
                         <table class="table table-hover align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>ID</th>
                                     <th>Tanggal Kunjungan</th>
                                     <th>Keperluan</th>
                                     <th>Status</th>
@@ -68,7 +67,6 @@
                                 @foreach (var ticket in filteredTickets)
                                 {
                                     <tr>
-                                        <td><strong>#@ticket.Id</strong></td>
                                         <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
                                         <td>@(string.IsNullOrEmpty(ticket.Purpose) ? "-" : ticket.Purpose)</td>
                                         <td>
@@ -92,7 +90,7 @@
                                         <td>
                                             @if (ticket.TimeIn.HasValue)
                                             {
-                                                @ticket.TimeIn.Value.ToLocalTime().ToString("HH:mm")
+                                                @ticket.TimeIn.Value.ToString("HH:mm")
                                             }
                                             else
                                             {

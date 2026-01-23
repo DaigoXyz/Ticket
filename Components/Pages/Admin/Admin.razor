@@ -172,7 +172,6 @@
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>ID</th>
                                         <th>Visitor</th>
                                         <th>Visit Date</th>
                                         <th>Purpose</th>
@@ -185,7 +184,6 @@
                                     @foreach (var t in _recentTickets)
                                     {
                                         <tr>
-                                            <td><strong>#@t.Id</strong></td>
                                             <td>@t.User?.Name</td>
                                             <td>@t.VisitDate.ToString("dd MMM yyyy")</td>
                                             <td>@(string.IsNullOrEmpty(t.Purpose) ? "-" : t.Purpose)</td>
@@ -210,14 +208,14 @@
                                             <td>
                                                 @if (t.TimeIn.HasValue)
                                                 {
-                                                    @t.TimeIn.Value.ToLocalTime().ToString("HH:mm")
+                                                    @t.TimeIn.Value.ToString("HH:mm")
                                                 }
                                                 else
                                                 {
                                                     <span class="text-muted">-</span>
                                                 }
                                             </td>
-                                            <td>@t.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                                            <td>@t.CreatedAt.ToString("dd/MM HH:mm")</td>
                                         </tr>
                                     }
                                 </tbody>

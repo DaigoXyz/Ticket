@@ -78,7 +78,6 @@
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>ID</th>
                                 <th>Pengunjung</th>
                                 <th>Tanggal Kunjungan</th>
                                 <th>Keperluan</th>
@@ -92,7 +91,6 @@
                             @foreach (var ticket in filteredTickets)
                             {
                                 <tr>
-                                    <td><strong>#@ticket.Id</strong></td>
                                     <td>@ticket.User?.Name</td>
                                     <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
                                     <td>@(string.IsNullOrEmpty(ticket.Purpose) ? "-" : ticket.Purpose)</td>
@@ -117,14 +115,14 @@
                                     <td>
                                         @if (ticket.TimeIn.HasValue)
                                         {
-                                            @ticket.TimeIn.Value.ToLocalTime().ToString("HH:mm")
+                                            @ticket.TimeIn.Value.ToString("HH:mm")
                                         }
                                         else
                                         {
                                             <span class="text-muted">-</span>
                                         }
                                     </td>
-                                    <td>@ticket.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                                    <td>@ticket.CreatedAt.ToString("dd/MM HH:mm")</td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             @if (ticket.Status == "Booked")

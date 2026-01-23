@@ -88,7 +88,6 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
                                     <th>Tanggal Kunjungan</th>
                                     <th>Keperluan</th>
                                     <th>Status</th>
@@ -99,7 +98,6 @@
                                 @foreach (var ticket in upcomingTickets)
                                 {
                                     <tr>
-                                        <td>#@ticket.Id</td>
                                         <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
                                         <td>@(string.IsNullOrEmpty(ticket.Purpose) ? "-" : ticket.Purpose)</td>
                                         <td>
