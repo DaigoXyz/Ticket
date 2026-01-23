@@ -37,11 +37,6 @@
                     <i class="bi bi-ticket-perforated"></i>
                     <span class="nav-text">My Tickets</span>
                 </NavLink>
-
-                <NavLink class="sidebar-link" href="/profile" Match="NavLinkMatch.All">
-                    <i class="bi bi-person-circle"></i>
-                    <span class="nav-text">Profile</span>
-                </NavLink>
             }
 
             @if (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
