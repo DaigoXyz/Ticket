@@ -92,7 +92,7 @@
                                         <td>
                                             @if (ticket.TimeIn.HasValue)
                                             {
-                                                @ticket.TimeIn.Value.ToLocalTime().ToString("HH:mm")
+                                                @ticket.TimeIn.Value.ToString("HH:mm")
                                             }
                                             else
                                             {
