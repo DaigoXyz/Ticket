@@ -1,8 +1,11 @@
 @page "/dashboard"
 @rendermode InteractiveServer
 @inject Blazored.SessionStorage.ISessionStorageService SessionStorage
-@inject Ticket.Repositories.IRepositories.IEntryTicketRepository TicketRepo
+@inject IEntryTicketRepository TicketRepo
+@inject IOrderRepository OrderRepo
 @inject NavigationManager Nav
+@using Ticket.Models
+@using Ticket.Repositories.IRepositories
 
 <div class="container mt-4">
     <div class="row mb-4">
@@ -11,8 +14,8 @@
             <p class="text-muted">Selamat datang, @currentUser?.Name</p>
         </div>
         <div class="col-auto">
-            <a href="/tickets/create" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Buy Ticket
+            <a href="/tickets" class="btn btn-primary">
+                <i class="bi bi-search"></i> Jelajahi Tiket
             </a>
         </div>
     </div>
@@ -27,13 +30,14 @@
     }
     else
     {
+        <!-- Statistics Cards -->
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card border-primary">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-1">Total Tickets</h6>
+                                <h6 class="text-muted mb-1">Total Tiket</h6>
                                 <h3 class="mb-0">@totalTickets</h3>
                             </div>
                             <div class="bg-primary bg-opacity-10 p-3 rounded">
@@ -44,23 +48,23 @@
                 </div>
             </div>
 
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card border-success">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="text-muted mb-1">Booked</h6>
-                                <h3 class="mb-0">@bookedCount</h3>
+                                <h6 class="text-muted mb-1">Issued</h6>
+                                <h3 class="mb-0">@issuedCount</h3>
                             </div>
                             <div class="bg-success bg-opacity-10 p-3 rounded">
-                                <i class="bi bi-calendar-check fs-3 text-success"></i>
+                                <i class="bi bi-check-circle fs-3 text-success"></i>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="card border-info">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -75,22 +79,72 @@
                     </div>
                 </div>
             </div>
+
+            <div class="col-md-3">
+                <div class="card border-warning">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-1">Total Belanja</h6>
+                                <h3 class="mb-0 small">Rp @totalSpent.ToString("N0")</h3>
+                            </div>
+                            <div class="bg-warning bg-opacity-10 p-3 rounded">
+                                <i class="bi bi-wallet2 fs-3 text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
+        <!-- Quick Actions -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-cart-plus fs-1 text-primary mb-3"></i>
+                        <h5>Beli Tiket Baru</h5>
+                        <p class="text-muted small">Jelajahi katalog dan beli tiket untuk petualangan Anda</p>
+                        <a href="/tickets" class="btn btn-primary">
+                            <i class="bi bi-search"></i> Lihat Katalog
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-ticket-detailed fs-1 text-success mb-3"></i>
+                        <h5>Tiket Saya</h5>
+                        <p class="text-muted small">Lihat semua tiket yang sudah dibeli dan kelola tiket Anda</p>
+                        <a href="/my-tickets" class="btn btn-success">
+                            <i class="bi bi-ticket-perforated"></i> Lihat Tiket
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Tickets -->
         <div class="card shadow-sm">
             <div class="card-header bg-white">
-                <h5 class="mb-0">Upcoming Tickets</h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Tiket Mendatang</h5>
+                    <a href="/my-tickets" class="btn btn-sm btn-outline-primary">Lihat Semua</a>
+                </div>
             </div>
             <div class="card-body">
                 @if (upcomingTickets.Any())
                 {
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
                                 <tr>
+                                    <th>Produk</th>
                                     <th>Tanggal Kunjungan</th>
                                     <th>Keperluan</th>
                                     <th>Status</th>
+                                    <th>Harga</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -98,25 +152,31 @@
                                 @foreach (var ticket in upcomingTickets)
                                 {
                                     <tr>
+                                        <td><strong>@ticket.TicketProduct?.Name</strong></td>
                                         <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
                                         <td>@(string.IsNullOrEmpty(ticket.Purpose) ? "-" : ticket.Purpose)</td>
                                         <td>
-                                            @if (ticket.Status == "Booked")
+                                            @if (ticket.Status == "Issued")
                                             {
-                                                <span class="badge bg-success">Booked</span>
+                                                <span class="badge bg-success">Issued</span>
                                             }
                                             else if (ticket.Status == "CheckedIn")
                                             {
                                                 <span class="badge bg-info">Checked In</span>
+                                            }
+                                            else if (ticket.Status == "Used")
+                                            {
+                                                <span class="badge bg-secondary">Used</span>
                                             }
                                             else
                                             {
                                                 <span class="badge bg-secondary">@ticket.Status</span>
                                             }
                                         </td>
+                                        <td>Rp @ticket.Price.ToString("N0")</td>
                                         <td>
-                                            <a href="/tickets/@ticket.Id" class="btn btn-sm btn-outline-primary">
-                                                Detail
+                                            <a href="/my-tickets" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i> Detail
                                             </a>
                                         </td>
                                     </tr>
@@ -129,8 +189,10 @@
                 {
                     <div class="text-center py-4">
                         <i class="bi bi-inbox fs-1 text-muted"></i>
-                        <p class="text-muted mt-2">No upcoming tickets yet</p>
-                        <a href="/tickets/create" class="btn btn-primary">Buy Ticket</a>
+                        <p class="text-muted mt-2 mb-3">Belum ada tiket untuk kunjungan mendatang</p>
+                        <a href="/tickets" class="btn btn-primary">
+                            <i class="bi bi-cart-plus"></i> Beli Tiket
+                        </a>
                     </div>
                 }
             </div>
@@ -143,10 +205,12 @@
     private bool loading = true;
     private List<EntryTickets> userTickets = new();
     private List<EntryTickets> upcomingTickets = new();
+    private List<Orders> userOrders = new();
 
     private int totalTickets => userTickets.Count;
-    private int bookedCount => userTickets.Count(t => t.Status == "Booked");
+    private int issuedCount => userTickets.Count(t => t.Status == "Issued");
     private int checkedInCount => userTickets.Count(t => t.Status == "CheckedIn");
+    private decimal totalSpent => userOrders.Where(o => o.Status == "Paid").Sum(o => o.TotalAmount);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -172,19 +236,16 @@
                 return;
             }
 
-            // optional: blok user nonaktif
             if (!currentUser.IsActive)
             {
-                // biar nggak loading terus
                 return;
             }
 
-            await LoadTickets();
+            await LoadData();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Dashboard init error: {ex.Message}");
-            // optional: tampilkan error message di UI
         }
         finally
         {
@@ -193,12 +254,13 @@
         }
     }
 
-
-    private async Task LoadTickets()
+    private async Task LoadData()
     {
         if (currentUser != null)
         {
             userTickets = await TicketRepo.GetByUserIdAsync(currentUser.Id);
+            userOrders = await OrderRepo.GetByUserIdAsync(currentUser.Id);
+
             upcomingTickets = userTickets
             .Where(t => t.VisitDate.Date >= DateTime.Now.Date)
             .OrderBy(t => t.VisitDate)

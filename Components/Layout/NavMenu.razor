@@ -34,8 +34,13 @@
                 </NavLink>
 
                 <NavLink class="sidebar-link" href="/tickets" Match="NavLinkMatch.Prefix">
+                    <i class="bi bi-backpack4"></i>
+                    <span class="nav-text">Explore</span>
+                </NavLink>
+
+                <NavLink class="sidebar-link" href="/my-tickets" Match="NavLinkMatch.Prefix">
                     <i class="bi bi-ticket-perforated"></i>
-                    <span class="nav-text">My Tickets</span>
+                    <span class="nav-text">My Ticket</span>
                 </NavLink>
             }
 
@@ -58,9 +63,14 @@
                     <span class="nav-text">Manage Users</span>
                 </NavLink>
 
-                <NavLink class="sidebar-link" href="/admin/tickets" Match="NavLinkMatch.All">
+                <NavLink class="sidebar-link" href="/admin/ticket-products" Match="NavLinkMatch.All">
                     <i class="bi bi-kanban"></i>
                     <span class="nav-text">Manage Tickets</span>
+                </NavLink>
+
+                <NavLink class="sidebar-link" href="/admin/orders" Match="NavLinkMatch.All">
+                    <i class="bi bi-card-list"></i>
+                    <span class="nav-text">Manage Orders</span>
                 </NavLink>
             }
         </div>

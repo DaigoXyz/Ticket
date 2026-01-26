@@ -12,6 +12,7 @@ namespace Ticket.Repositories.IRepositories
         Task<List<EntryTickets>> GetAllAsync();
         Task<List<EntryTickets>> GetByVisitDateAsync(DateTime date);
         Task<List<EntryTickets>> GetByUserIdAsync(int userId);
+        Task<EntryTickets?> GetByCodeAsync(string ticketCode);
 
         Task AddAsync(EntryTickets ticket);
         Task UpdateAsync(EntryTickets ticket);

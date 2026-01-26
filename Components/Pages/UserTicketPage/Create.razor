@@ -1,160 +1,326 @@
-@page "/tickets/create"
+@page "/tickets/buy/{ProductId:int}"
 @rendermode InteractiveServer
 @inject Blazored.SessionStorage.ISessionStorageService SessionStorage
-@inject Ticket.Repositories.IRepositories.IEntryTicketRepository TicketRepo
+@inject ITicketProductRepository ProductRepo
+@inject IEntryTicketRepository TicketRepo
+@inject IOrderRepository OrderRepo
 @inject NavigationManager Nav
 @using Ticket.Models
-@using Ticket.DTOs.EntryTicket
+@using Ticket.Repositories.IRepositories
 @using System.ComponentModel.DataAnnotations
 
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-lg-8">
+            <!-- Back Button -->
             <div class="mb-3">
                 <a href="/tickets" class="text-decoration-none">
-                    <i class="bi bi-arrow-left"></i> Kembali ke Daftar Tiket
+                    <i class="bi bi-arrow-left"></i> Kembali ke Katalog
                 </a>
             </div>
 
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Buat Tiket Baru</h4>
+            @if (loading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="text-muted mt-3">Memuat detail produk...</p>
                 </div>
-                <div class="card-body p-4">
-                    @if (!string.IsNullOrEmpty(errorMessage))
-                    {
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            @errorMessage
-                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
-                        </div>
-                    }
-
-                    @if (!string.IsNullOrEmpty(successMessage))
-                    {
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            @successMessage
-                            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
-                        </div>
-                    }
-
-                    <EditForm Model="model" OnValidSubmit="HandleSubmit">
-                        <DataAnnotationsValidator />
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">
-                                Tanggal Kunjungan <span class="text-danger">*</span>
-                            </label>
-                            <InputDate class="form-control" @bind-Value="model.VisitDate" min="@DateTime.Now.ToString("yyyy-MM-dd")" />
-                            <ValidationMessage For="() => model.VisitDate" class="text-danger" />
-                            <div class="form-text">Pilih tanggal kunjungan Anda</div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">
-                                Keperluan
-                            </label>
-                            <InputTextArea class="form-control" @bind-Value="model.Purpose" 
-                                           rows="4" placeholder="Contoh: Meeting dengan tim IT, Pengambilan dokumen, dll." />
-                            <ValidationMessage For="() => model.Purpose" class="text-danger" />
-                            <div class="form-text">Opsional - jelaskan tujuan kunjungan Anda</div>
-                        </div>
-
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i>
-                            <strong>Catatan:</strong> Tiket akan otomatis berstatus "Booked" setelah dibuat. 
-                            Tunjukkan tiket saat check-in di lokasi.
-                        </div>
-
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary" disabled="@loading">
-                                @if (loading)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2"></span>
-                                    <span>Menyimpan...</span>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-check-circle me-2"></i>
-                                    <span>Buat Tiket</span>
-                                }
-                            </button>
-                            <a href="/tickets" class="btn btn-outline-secondary">Batal</a>
-                        </div>
-                    </EditForm>
+            }
+            else if (product == null)
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Produk tiket tidak ditemukan atau tidak tersedia.
                 </div>
-            </div>
-
-            <div class="card shadow-sm mt-3">
-                <div class="card-body">
-                    <h6 class="fw-bold mb-3">
-                        <i class="bi bi-question-circle"></i> Petunjuk
-                    </h6>
-                    <ul class="mb-0">
-                        <li>Pilih tanggal kunjungan yang sesuai dengan rencana Anda</li>
-                        <li>Isi keperluan kunjungan untuk memudahkan proses verifikasi</li>
-                        <li>Tiket hanya berlaku untuk tanggal yang dipilih</li>
-                        <li>Anda dapat melihat dan mengelola tiket di halaman "Tiket Saya"</li>
-                    </ul>
+                <a href="/tickets" class="btn btn-primary">Kembali ke Katalog</a>
+            }
+            else
+            {
+                <!-- Product Info Card -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            <i class="bi bi-ticket-perforated"></i> @product.Name
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(product.Description))
+                        {
+                            <p class="text-muted">@product.Description</p>
+                        }
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h3 class="text-success fw-bold">
+                                    Rp @product.Price.ToString("N0")
+                                    <small class="text-muted fs-6">/tiket</small>
+                                </h3>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <span class="badge bg-success fs-6">
+                                    <i class="bi bi-check-circle"></i> Tersedia
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+
+                <!-- Order Form -->
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        <h5 class="mb-0">Detail Pemesanan</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                @errorMessage
+                                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success alert-dismissible fade show">
+                                @successMessage
+                                <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+                            </div>
+                        }
+
+                        <EditForm Model="model" OnValidSubmit="HandleSubmit">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    Jumlah Tiket <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group input-group-lg">
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="DecreaseQty">
+                                        <i class="bi bi-dash"></i>
+                                    </button>
+                                    <InputNumber class="form-control text-center fw-bold" @bind-Value="model.Qty" min="1"
+                                        max="20" readonly />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="IncreaseQty">
+                                        <i class="bi bi-plus"></i>
+                                    </button>
+                                </div>
+                                <ValidationMessage For="() => model.Qty" class="text-danger" />
+                                <div class="form-text">Maksimal 20 tiket per transaksi</div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    Tanggal Kunjungan <span class="text-danger">*</span>
+                                </label>
+                                <InputDate class="form-control form-control-lg" @bind-Value="model.VisitDate" />
+                                <ValidationMessage For="() => model.VisitDate" class="text-danger" />
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle"></i>
+                                    Pilih tanggal kunjungan Anda (minimal besok)
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    Keperluan/Catatan
+                                </label>
+                                <InputTextArea class="form-control" @bind-Value="model.Purpose" rows="4"
+                                    placeholder="Contoh: Wisata keluarga, Meeting bisnis, dll." />
+                                <ValidationMessage For="() => model.Purpose" class="text-danger" />
+                            </div>
+
+                            <!-- Order Summary -->
+                            <div class="card bg-light mb-4">
+                                <div class="card-body">
+                                    <h6 class="fw-bold mb-3">Ringkasan Pesanan</h6>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Harga Tiket</span>
+                                        <span>Rp @product.Price.ToString("N0")</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Jumlah</span>
+                                        <span>@model.Qty tiket</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Tanggal Kunjungan</span>
+                                        <span>@model.VisitDate.ToString("dd MMM yyyy")</span>
+                                    </div>
+                                    <hr />
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Total Pembayaran</strong>
+                                        <h4 class="text-success fw-bold mb-0">
+                                            Rp @((product.Price * model.Qty).ToString("N0"))
+                                        </h4>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Informasi:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Tiket akan langsung aktif setelah pembayaran</li>
+                                    <li>E-ticket dapat dilihat di menu "Tiket Saya"</li>
+                                    <li>Tunjukkan QR code saat check-in</li>
+                                </ul>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg" disabled="@submitting">
+                                    @if (submitting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        <span>Memproses...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-credit-card me-2"></i>
+                                        <span>Bayar Sekarang</span>
+                                    }
+                                </button>
+                                <a href="/tickets" class="btn btn-outline-secondary btn-lg">Batal</a>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>
 
 @code {
+    [Parameter]
+    public int ProductId { get; set; }
+
     private Users? currentUser;
-    private CreateTicketModel model = new();
-    private bool loading = false;
+    private TicketProducts? product;
+    private bool loading = true;
+    private bool submitting = false;
     private string? errorMessage;
     private string? successMessage;
+    private BuyTicketModel model = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
-            
-        currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
 
-        if (currentUser == null)
+        loading = true;
+        StateHasChanged();
+
+        try
         {
-            Nav.NavigateTo("/login", true);
-            return;
-        }
+            currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
 
-        model.VisitDate = DateTime.Now.Date.AddDays(1);
+            if (currentUser == null)
+            {
+                Nav.NavigateTo("/login", true);
+                return;
+            }
+
+            product = await ProductRepo.GetByIdAsync(ProductId);
+
+            if (product == null || !product.IsActive)
+            {
+                // Produk tidak valid
+            }
+            else
+            {
+                // Set default values
+                model.VisitDate = DateTime.Now.Date.AddDays(1);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Buy ticket page init error: {ex}");
+            errorMessage = "Terjadi kesalahan saat memuat produk";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void IncreaseQty()
+    {
+        if (model.Qty < 20)
+            model.Qty++;
+    }
+
+    private void DecreaseQty()
+    {
+        if (model.Qty > 1)
+            model.Qty--;
     }
 
     private async Task HandleSubmit()
     {
+        if (product == null || currentUser == null)
+            return;
+
         errorMessage = null;
         successMessage = null;
-        loading = true;
+        submitting = true;
 
         try
         {
+            // Validasi
             if (model.VisitDate.Date < DateTime.Now.Date)
             {
                 errorMessage = "Tanggal kunjungan tidak boleh di masa lalu";
-                loading = false;
                 return;
             }
 
-            var newTicket = new EntryTickets
+            if (model.Qty <= 0 || model.Qty > 20)
             {
-                UserId = currentUser!.Id,
-                VisitDate = model.VisitDate.Date,
-                Purpose = model.Purpose,
-                Status = "Booked",
-                CreatedAt = DateTime.Now
+                errorMessage = "Jumlah tiket harus antara 1-20";
+                return;
+            }
+
+            // Calculate total
+            var unitPrice = product.Price;
+            var total = unitPrice * model.Qty;
+
+            // Create order
+            var order = new Orders
+            {
+                UserId = currentUser.Id,
+                OrderNo = GenerateOrderNo(),
+                Status = "Paid", // Auto paid untuk simplifikasi
+                TotalAmount = total,
+                CreatedAt = DateTime.Now,
+                PaidAt = DateTime.Now
             };
 
-            await TicketRepo.AddAsync(newTicket);
+            await OrderRepo.AddAsync(order);
+            await OrderRepo.SaveChangesAsync();
+
+            // Generate tickets
+            for (int i = 0; i < model.Qty; i++)
+            {
+                var ticket = new EntryTickets
+                {
+                    UserId = currentUser.Id,
+                    TicketProductId = product.Id,
+                    OrderId = order.Id,
+                    TicketCode = Guid.NewGuid().ToString("N"),
+                    Price = unitPrice,
+                    VisitDate = model.VisitDate.Date,
+                    Purpose = model.Purpose,
+                    Status = "Issued",
+                    CreatedAt = DateTime.Now
+                };
+
+                await TicketRepo.AddAsync(ticket);
+            }
+
             await TicketRepo.SaveChangesAsync();
 
-            successMessage = "Tiket berhasil dibuat!";
-            
-            await Task.Delay(1500);
-            Nav.NavigateTo("/tickets", true);
+            successMessage = "Pembayaran berhasil! Tiket Anda telah diterbitkan.";
+
+            // Redirect after delay
+            await Task.Delay(2000);
+            Nav.NavigateTo("/my-tickets", true);
         }
         catch (Exception ex)
         {
@@ -162,12 +328,22 @@
         }
         finally
         {
-            loading = false;
+            submitting = false;
         }
     }
 
-    public class CreateTicketModel
+    private static string GenerateOrderNo()
     {
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        var rand = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        return $"ORD-{stamp}-{rand}";
+    }
+
+    public class BuyTicketModel
+    {
+        [Range(1, 20, ErrorMessage = "Jumlah tiket harus antara 1-20")]
+        public int Qty { get; set; } = 1;
+
         [Required(ErrorMessage = "Tanggal kunjungan harus diisi")]
         public DateTime VisitDate { get; set; } = DateTime.Now.Date.AddDays(1);
 

@@ -1,22 +1,21 @@
-@page "/admin/tickets"
+@page "/admin/ticket-products"
 @rendermode InteractiveServer
 @inject Blazored.SessionStorage.ISessionStorageService SessionStorage
-@inject IEntryTicketRepository TicketRepo
-@inject IUserRepository UserRepo
+@inject ITicketProductRepository ProductRepo
 @inject NavigationManager Nav
 @using Ticket.Models
 @using Ticket.Repositories.IRepositories
-@using Ticket.DTOs.EntryTicket
+@using System.ComponentModel.DataAnnotations
 
 <div class="container-fluid mt-4">
     <div class="row mb-4">
         <div class="col">
-            <h2>Manage Tickets</h2>
-            <p class="text-muted">Kelola semua tiket kunjungan</p>
+            <h2>Manage Ticket Products</h2>
+            <p class="text-muted">Kelola produk tiket yang tersedia untuk dibeli</p>
         </div>
         <div class="col-auto">
             <button class="btn btn-primary" @onclick="ShowCreateModal">
-                <i class="bi bi-plus-circle"></i> Tambah Ticket
+                <i class="bi bi-plus-circle"></i> Tambah Produk
             </button>
         </div>
     </div>
@@ -40,20 +39,16 @@
     <div class="card shadow-sm mb-3">
         <div class="card-body">
             <div class="row g-2">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" placeholder="Cari produk..." @bind="searchTerm"
+                        @bind:event="oninput" @onkeyup="FilterProducts" />
+                </div>
                 <div class="col-md-3">
-                    <input type="text" class="form-control" placeholder="Cari ticket..." @bind="searchTerm"
-                        @bind:event="oninput" @onkeyup="FilterTickets" />
-                </div>
-                <div class="col-md-2">
-                    <select class="form-select" @bind="filterStatus" @bind:after="FilterTickets">
+                    <select class="form-select" @bind="filterStatus" @bind:after="FilterProducts">
                         <option value="">Semua Status</option>
-                        <option value="Booked">Booked</option>
-                        <option value="CheckedIn">Checked In</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="active">Aktif</option>
+                        <option value="inactive">Tidak Aktif</option>
                     </select>
-                </div>
-                <div class="col-md-2">
-                    <input type="date" class="form-control" @bind="filterDate" @bind:after="FilterTickets" />
                 </div>
                 <div class="col-md-2">
                     <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
@@ -78,64 +73,66 @@
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Pengunjung</th>
-                                <th>Tanggal Kunjungan</th>
-                                <th>Keperluan</th>
+                                <th>ID</th>
+                                <th>Nama Produk</th>
+                                <th>Deskripsi</th>
+                                <th>Harga</th>
                                 <th>Status</th>
-                                <th>Waktu Check-In</th>
-                                <th>Dibuat</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var ticket in filteredTickets)
+                            @foreach (var product in filteredProducts)
                             {
                                 <tr>
-                                    <td>@ticket.User?.Name</td>
-                                    <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
-                                    <td>@(string.IsNullOrEmpty(ticket.Purpose) ? "-" : ticket.Purpose)</td>
+                                    <td>#@product.Id</td>
                                     <td>
-                                        @if (ticket.Status == "Booked")
-                                        {
-                                            <span class="badge bg-warning">Booked</span>
-                                        }
-                                        else if (ticket.Status == "CheckedIn")
-                                        {
-                                            <span class="badge bg-success">Checked In</span>
-                                        }
-                                        else if (ticket.Status == "Cancelled")
-                                        {
-                                            <span class="badge bg-danger">Cancelled</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-secondary">@ticket.Status</span>
-                                        }
+                                        <strong>@product.Name</strong>
                                     </td>
                                     <td>
-                                        @if (ticket.TimeIn.HasValue)
-                                        {
-                                            @ticket.TimeIn.Value.ToString("HH:mm")
-                                        }
-                                        else
+                                        @if (string.IsNullOrEmpty(product.Description))
                                         {
                                             <span class="text-muted">-</span>
                                         }
+                                        else
+                                        {
+                                            <span>@(product.Description.Length > 50 ? product.Description.Substring(0, 50) + "..." :
+                                                                                    product.Description)</span>
+                                        }
                                     </td>
-                                    <td>@ticket.CreatedAt.ToString("dd/MM HH:mm")</td>
+                                    <td>
+                                        <strong class="text-success">Rp @product.Price.ToString("N0")</strong>
+                                    </td>
+                                    <td>
+                                        @if (product.IsActive)
+                                        {
+                                            <span class="badge bg-success">Aktif</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Tidak Aktif</span>
+                                        }
+                                    </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            @if (ticket.Status == "Booked")
+                                            @if (product.IsActive)
                                             {
-                                                <button class="btn btn-outline-success" @onclick="() => CheckInTicket(ticket)"
-                                                    title="Check In">
-                                                    <i class="bi bi-box-arrow-in-right"></i>
+                                                <button class="btn btn-outline-warning" @onclick="() => ToggleStatus(product)"
+                                                    title="Nonaktifkan">
+                                                    <i class="bi bi-toggle-on"></i>
                                                 </button>
                                             }
-                                            <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(ticket)">
+                                            else
+                                            {
+                                                <button class="btn btn-outline-success" @onclick="() => ToggleStatus(product)"
+                                                    title="Aktifkan">
+                                                    <i class="bi bi-toggle-off"></i>
+                                                </button>
+                                            }
+                                            <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(product)">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
-                                            <button class="btn btn-outline-danger" @onclick="() => ShowDeleteConfirm(ticket)">
+                                            <button class="btn btn-outline-danger" @onclick="() => ShowDeleteConfirm(product)">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -146,17 +143,17 @@
                     </table>
                 </div>
 
-                @if (!filteredTickets.Any())
+                @if (!filteredProducts.Any())
                 {
                     <div class="text-center py-4">
                         <i class="bi bi-inbox fs-1 text-muted"></i>
-                        <p class="text-muted mt-2">Tidak ada tiket yang sesuai filter</p>
+                        <p class="text-muted mt-2">Tidak ada produk yang sesuai filter</p>
                     </div>
                 }
                 else
                 {
                     <p class="text-muted mt-3 mb-0">
-                        Menampilkan @filteredTickets.Count dari @allTickets.Count tiket
+                        Menampilkan @filteredProducts.Count dari @allProducts.Count produk
                     </p>
                 }
             </div>
@@ -171,52 +168,42 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@(isEditMode ? "Edit Ticket" : "Tambah Ticket")</h5>
+                    <h5 class="modal-title">@(isEditMode ? "Edit Produk Tiket" : "Tambah Produk Tiket")</h5>
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
-                <EditForm Model="ticketModel" OnValidSubmit="HandleSave">
+                <EditForm Model="productModel" OnValidSubmit="HandleSave">
                     <DataAnnotationsValidator />
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Pengunjung <span class="text-danger">*</span></label>
-                            <InputSelect class="form-select" @bind-Value="ticketModel.UserId" disabled="@isEditMode">
-                                <option value="0">-- Pilih User --</option>
-                                @foreach (var user in users)
-                                {
-                                    <option value="@user.Id">@user.Name (@user.Username)</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="() => ticketModel.UserId" class="text-danger" />
+                            <label class="form-label">Nama Produk <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="productModel.Name"
+                                placeholder="Contoh: Tiket Reguler Weekday" />
+                            <ValidationMessage For="() => productModel.Name" class="text-danger" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Tanggal Kunjungan <span class="text-danger">*</span></label>
-                            <InputDate class="form-control" @bind-Value="ticketModel.VisitDate" />
-                            <ValidationMessage For="() => ticketModel.VisitDate" class="text-danger" />
+                            <label class="form-label">Deskripsi</label>
+                            <InputTextArea class="form-control" @bind-Value="productModel.Description" rows="3"
+                                placeholder="Deskripsi produk tiket..." />
+                            <ValidationMessage For="() => productModel.Description" class="text-danger" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Keperluan</label>
-                            <InputTextArea class="form-control" @bind-Value="ticketModel.Purpose" rows="3" />
+                            <label class="form-label">Harga (Rp) <span class="text-danger">*</span></label>
+                            <InputNumber class="form-control" @bind-Value="productModel.Price" placeholder="50000" />
+                            <ValidationMessage For="() => productModel.Price" class="text-danger" />
+                            <div class="form-text">Masukkan harga dalam Rupiah</div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Status <span class="text-danger">*</span></label>
-                            <InputSelect class="form-select" @bind-Value="ticketModel.Status">
-                                <option value="Booked">Booked</option>
-                                <option value="CheckedIn">Checked In</option>
-                                <option value="Cancelled">Cancelled</option>
-                            </InputSelect>
-                        </div>
-
-                        @if (ticketModel.Status == "CheckedIn")
-                        {
-                            <div class="mb-3">
-                                <label class="form-label">Waktu Check-In</label>
-                                <InputDate Type="InputDateType.DateTimeLocal" class="form-control"
-                                    @bind-Value="ticketModel.TimeIn" />
+                            <div class="form-check">
+                                <InputCheckbox class="form-check-input" @bind-Value="productModel.IsActive"
+                                    id="isActiveCheck" />
+                                <label class="form-check-label" for="isActiveCheck">
+                                    Produk Aktif (dapat dibeli user)
+                                </label>
                             </div>
-                        }
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" @onclick="CloseModal">Batal</button>
@@ -235,7 +222,7 @@
 }
 
 <!-- Delete Confirmation Modal -->
-@if (showDeleteModal && ticketToDelete != null)
+@if (showDeleteModal && productToDelete != null)
 {
     <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog">
@@ -245,11 +232,11 @@
                     <button type="button" class="btn-close btn-close-white" @onclick="CloseDeleteModal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Apakah Anda yakin ingin menghapus tiket ini?</p>
+                    <p>Apakah Anda yakin ingin menghapus produk tiket ini?</p>
                     <div class="alert alert-warning">
-                        <strong>ID:</strong> #@ticketToDelete.Id<br />
-                        <strong>Pengunjung:</strong> @ticketToDelete.User?.Name<br />
-                        <strong>Tanggal:</strong> @ticketToDelete.VisitDate.ToString("dd MMM yyyy")
+                        <strong>ID:</strong> #@productToDelete.Id<br />
+                        <strong>Nama:</strong> @productToDelete.Name<br />
+                        <strong>Harga:</strong> Rp @productToDelete.Price.ToString("N0")
                     </div>
                     <p class="text-danger mb-0">
                         <i class="bi bi-exclamation-triangle"></i>
@@ -274,12 +261,10 @@
 @code {
     private Users? currentUser;
     private bool loading = true;
-    private List<EntryTickets> allTickets = new();
-    private List<EntryTickets> filteredTickets = new();
-    private List<Users> users = new();
+    private List<TicketProducts> allProducts = new();
+    private List<TicketProducts> filteredProducts = new();
     private string searchTerm = string.Empty;
     private string filterStatus = string.Empty;
-    private DateTime? filterDate;
     private string? successMessage;
     private string? errorMessage;
 
@@ -289,9 +274,9 @@
     private bool isEditMode = false;
     private bool saving = false;
     private bool deleting = false;
-    private TicketFormModel ticketModel = new();
-    private EntryTickets? ticketToDelete;
-    private EntryTickets? ticketToEdit;
+    private ProductFormModel productModel = new();
+    private TicketProducts? productToDelete;
+    private TicketProducts? productToEdit;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -315,8 +300,8 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Tickets page init error: {ex}");
-            // optional: tampilkan error message di UI
+            Console.WriteLine($"Ticket Products page init error: {ex}");
+            errorMessage = "Terjadi kesalahan saat memuat data";
         }
         finally
         {
@@ -327,32 +312,29 @@
 
     private async Task LoadData()
     {
-        allTickets = await TicketRepo.GetAllAsync() ?? new();
-        users = await UserRepo.GetAllAsync() ?? new();
-        filteredTickets = allTickets;
+        allProducts = await ProductRepo.GetAllAsync() ?? new();
+        filteredProducts = allProducts;
     }
 
-    private void FilterTickets()
+    private void FilterProducts()
     {
-        filteredTickets = allTickets;
+        filteredProducts = allProducts;
 
         if (!string.IsNullOrEmpty(searchTerm))
         {
-            filteredTickets = filteredTickets.Where(t =>
-            t.Id.ToString().Contains(searchTerm) ||
-            (t.User != null && t.User.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-            (t.Purpose != null && t.Purpose.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            filteredProducts = filteredProducts.Where(p =>
+            p.Id.ToString().Contains(searchTerm) ||
+            p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (p.Description != null && p.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
             ).ToList();
         }
 
         if (!string.IsNullOrEmpty(filterStatus))
         {
-            filteredTickets = filteredTickets.Where(t => t.Status == filterStatus).ToList();
-        }
-
-        if (filterDate.HasValue)
-        {
-            filteredTickets = filteredTickets.Where(t => t.VisitDate.Date == filterDate.Value.Date).ToList();
+            if (filterStatus == "active")
+                filteredProducts = filteredProducts.Where(p => p.IsActive).ToList();
+            else if (filterStatus == "inactive")
+                filteredProducts = filteredProducts.Where(p => !p.IsActive).ToList();
         }
     }
 
@@ -360,32 +342,29 @@
     {
         searchTerm = string.Empty;
         filterStatus = string.Empty;
-        filterDate = null;
-        FilterTickets();
+        FilterProducts();
     }
 
     private void ShowCreateModal()
     {
         isEditMode = false;
-        ticketModel = new TicketFormModel
+        productModel = new ProductFormModel
         {
-            VisitDate = DateTime.Now.Date.AddDays(1),
-            Status = "Booked"
+            IsActive = true
         };
         showModal = true;
     }
 
-    private void ShowEditModal(EntryTickets ticket)
+    private void ShowEditModal(TicketProducts product)
     {
         isEditMode = true;
-        ticketToEdit = ticket;
-        ticketModel = new TicketFormModel
+        productToEdit = product;
+        productModel = new ProductFormModel
         {
-            UserId = ticket.UserId,
-            VisitDate = ticket.VisitDate,
-            Purpose = ticket.Purpose,
-            Status = ticket.Status,
-            TimeIn = ticket.TimeIn
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            IsActive = product.IsActive
         };
         showModal = true;
     }
@@ -393,8 +372,8 @@
     private void CloseModal()
     {
         showModal = false;
-        ticketModel = new();
-        ticketToEdit = null;
+        productModel = new();
+        productToEdit = null;
     }
 
     private async Task HandleSave()
@@ -405,36 +384,34 @@
 
         try
         {
-            if (isEditMode && ticketToEdit != null)
+            if (isEditMode && productToEdit != null)
             {
-                ticketToEdit.VisitDate = ticketModel.VisitDate;
-                ticketToEdit.Purpose = ticketModel.Purpose;
-                ticketToEdit.Status = ticketModel.Status;
-                ticketToEdit.TimeIn = ticketModel.Status == "CheckedIn" ? ticketModel.TimeIn : null;
+                productToEdit.Name = productModel.Name;
+                productToEdit.Description = productModel.Description;
+                productToEdit.Price = productModel.Price;
+                productToEdit.IsActive = productModel.IsActive;
 
-                await TicketRepo.UpdateAsync(ticketToEdit);
-                await TicketRepo.SaveChangesAsync();
-                successMessage = "Ticket berhasil diupdate!";
+                await ProductRepo.UpdateAsync(productToEdit);
+                await ProductRepo.SaveChangesAsync();
+                successMessage = "Produk berhasil diupdate!";
             }
             else
             {
-                var newTicket = new EntryTickets
+                var newProduct = new TicketProducts
                 {
-                    UserId = ticketModel.UserId,
-                    VisitDate = ticketModel.VisitDate,
-                    Purpose = ticketModel.Purpose,
-                    Status = ticketModel.Status,
-                    TimeIn = ticketModel.Status == "CheckedIn" ? ticketModel.TimeIn : null,
-                    CreatedAt = DateTime.Now
+                    Name = productModel.Name,
+                    Description = productModel.Description,
+                    Price = productModel.Price,
+                    IsActive = productModel.IsActive
                 };
 
-                await TicketRepo.AddAsync(newTicket);
-                await TicketRepo.SaveChangesAsync();
-                successMessage = "Ticket berhasil ditambahkan!";
+                await ProductRepo.AddAsync(newProduct);
+                await ProductRepo.SaveChangesAsync();
+                successMessage = "Produk berhasil ditambahkan!";
             }
 
             await LoadData();
-            FilterTickets();
+            FilterProducts();
             CloseModal();
         }
         catch (Exception ex)
@@ -447,20 +424,18 @@
         }
     }
 
-    private async Task CheckInTicket(EntryTickets ticket)
+    private async Task ToggleStatus(TicketProducts product)
     {
         try
         {
-            ticket.Status = "CheckedIn";
-            ticket.TimeIn = DateTime.Now;
+            product.IsActive = !product.IsActive;
+            await ProductRepo.UpdateAsync(product);
+            await ProductRepo.SaveChangesAsync();
 
-            await TicketRepo.UpdateAsync(ticket);
-            await TicketRepo.SaveChangesAsync();
-
-            successMessage = $"Ticket #{ticket.Id} berhasil di-check in!";
+            successMessage = $"Status produk '{product.Name}' berhasil diubah menjadi {(product.IsActive ? "Aktif" : "Tidak Aktif")}!";
 
             await LoadData();
-            FilterTickets();
+            FilterProducts();
         }
         catch (Exception ex)
         {
@@ -468,33 +443,33 @@
         }
     }
 
-    private void ShowDeleteConfirm(EntryTickets ticket)
+    private void ShowDeleteConfirm(TicketProducts product)
     {
-        ticketToDelete = ticket;
+        productToDelete = product;
         showDeleteModal = true;
     }
 
     private void CloseDeleteModal()
     {
         showDeleteModal = false;
-        ticketToDelete = null;
+        productToDelete = null;
     }
 
     private async Task HandleDelete()
     {
-        if (ticketToDelete == null) return;
+        if (productToDelete == null) return;
 
         deleting = true;
         errorMessage = null;
 
         try
         {
-            await TicketRepo.DeleteAsync(ticketToDelete.Id);
-            await TicketRepo.SaveChangesAsync();
-            successMessage = $"Ticket #{ticketToDelete.Id} berhasil dihapus!";
+            await ProductRepo.DeleteAsync(productToDelete.Id);
+            await ProductRepo.SaveChangesAsync();
+            successMessage = $"Produk '{productToDelete.Name}' berhasil dihapus!";
 
             await LoadData();
-            FilterTickets();
+            FilterProducts();
             CloseDeleteModal();
         }
         catch (Exception ex)
@@ -507,19 +482,19 @@
         }
     }
 
-    public class TicketFormModel
+    public class ProductFormModel
     {
-        [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue, ErrorMessage = "Pilih pengunjung")]
-        public int UserId { get; set; }
+        [Required(ErrorMessage = "Nama produk harus diisi")]
+        [StringLength(200, ErrorMessage = "Nama produk maksimal 200 karakter")]
+        public string Name { get; set; } = string.Empty;
 
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Tanggal kunjungan harus diisi")]
-        public DateTime VisitDate { get; set; }
+        [StringLength(1000, ErrorMessage = "Deskripsi maksimal 1000 karakter")]
+        public string? Description { get; set; }
 
-        public string? Purpose { get; set; }
+        [Required(ErrorMessage = "Harga harus diisi")]
+        [Range(0, 999999999, ErrorMessage = "Harga harus antara 0 - 999.999.999")]
+        public decimal Price { get; set; }
 
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Status harus dipilih")]
-        public string Status { get; set; } = "Booked";
-
-        public DateTime? TimeIn { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

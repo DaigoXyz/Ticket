@@ -28,6 +28,8 @@ builder.Services.AddScoped<IPasswordHash, PasswordHash>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<AuthState>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ITicketProductRepository, TicketProductRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 
 builder.Services.AddBlazoredSessionStorage();
 

@@ -1,0 +1,431 @@
+@page "/admin/orders"
+@rendermode InteractiveServer
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject IOrderRepository OrderRepo
+@inject IEntryTicketRepository TicketRepo
+@inject NavigationManager Nav
+@using Ticket.Models
+@using Ticket.Repositories.IRepositories
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Manage Orders & Tickets</h2>
+            <p class="text-muted">Kelola semua pesanan dan tiket kunjungan</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" placeholder="Cari order/tiket..." @bind="searchTerm"
+                        @bind:event="oninput" @onkeyup="FilterOrders" />
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" @bind="filterStatus" @bind:after="FilterOrders">
+                        <option value="">Semua Status</option>
+                        <option value="Issued">Issued</option>
+                        <option value="CheckedIn">Checked In</option>
+                        <option value="Used">Used</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" class="form-control" @bind="filterDate" @bind:after="FilterOrders" />
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary"></div>
+        </div>
+    }
+    else
+    {
+        <!-- Orders List -->
+        @if (!filteredOrders.Any())
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <p class="text-muted mt-2">Tidak ada order yang sesuai filter</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var order in filteredOrders)
+            {
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h6 class="mb-1">
+                                    <i class="bi bi-receipt"></i> Order #@order.OrderNo
+                                </h6>
+                                <small class="text-muted">
+                                    <i class="bi bi-person"></i> @order.User?.Name (@order.User?.Username) •
+                                    <i class="bi bi-calendar"></i> @order.CreatedAt.ToString("dd MMM yyyy HH:mm")
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <h5 class="mb-0 text-success">Rp @order.TotalAmount.ToString("N0")</h5>
+                                <small class="text-muted">
+                                    @order.Tickets.Count tiket • Status: <strong>@order.Status</strong>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Tickets Table -->
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="60">ID</th>
+                                        <th>Kode Tiket</th>
+                                        <th>Produk</th>
+                                        <th>Tanggal Kunjungan</th>
+                                        <th>Keperluan</th>
+                                        <th>Status</th>
+                                        <th>Check-in</th>
+                                        <th width="150">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var ticket in order.Tickets)
+                                    {
+                                        <tr>
+                                            <td><small>#@ticket.Id</small></td>
+                                            <td><code class="small">@ticket.TicketCode[..8]...</code></td>
+                                            <td><strong>@ticket.TicketProduct?.Name</strong></td>
+                                            <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                @if (string.IsNullOrEmpty(ticket.Purpose))
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                                else
+                                                {
+                                                    <small>@(ticket.Purpose.Length > 30 ? ticket.Purpose.Substring(0, 30) + "..." :
+                                                                                            ticket.Purpose)</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (ticket.Status == "Issued")
+                                                {
+                                                    <span class="badge bg-success">Issued</span>
+                                                }
+                                                else if (ticket.Status == "CheckedIn")
+                                                {
+                                                    <span class="badge bg-info">Checked In</span>
+                                                }
+                                                else if (ticket.Status == "Used")
+                                                {
+                                                    <span class="badge bg-secondary">Used</span>
+                                                }
+                                                else if (ticket.Status == "Cancelled")
+                                                {
+                                                    <span class="badge bg-danger">Cancelled</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">@ticket.Status</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (ticket.TimeIn.HasValue)
+                                                {
+                                                    <small>@ticket.TimeIn.Value.ToString("dd/MM HH:mm")</small>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    @if (ticket.Status == "Issued")
+                                                    {
+                                                        <button class="btn btn-success" @onclick="() => CheckInTicket(ticket)"
+                                                            title="Check In">
+                                                            <i class="bi bi-box-arrow-in-right"></i>
+                                                        </button>
+                                                    }
+                                                    else if (ticket.Status == "CheckedIn")
+                                                    {
+                                                        <button class="btn btn-secondary" @onclick="() => MarkAsUsed(ticket)"
+                                                            title="Tandai Selesai">
+                                                            <i class="bi bi-check-circle"></i>
+                                                        </button>
+                                                    }
+
+                                                    @if (ticket.Status != "Cancelled" && ticket.Status != "Used")
+                                                    {
+                                                        <button class="btn btn-outline-danger" @onclick="() => ShowCancelConfirm(ticket)"
+                                                            title="Batalkan">
+                                                            <i class="bi bi-x-circle"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <p class="text-muted text-center mt-3">
+                Menampilkan @filteredOrders.Count dari @allOrders.Count order
+            </p>
+        }
+    }
+</div>
+
+<!-- Cancel Confirmation Modal -->
+@if (showCancelModal && ticketToCancel != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Konfirmasi Batalkan Tiket</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseCancelModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Apakah Anda yakin ingin membatalkan tiket ini?</p>
+                    <div class="alert alert-warning">
+                        <strong>Kode:</strong> @ticketToCancel.TicketCode<br />
+                        <strong>Produk:</strong> @ticketToCancel.TicketProduct?.Name<br />
+                        <strong>User:</strong> @ticketToCancel.User?.Name<br />
+                        <strong>Tanggal:</strong> @ticketToCancel.VisitDate.ToString("dd MMM yyyy")
+                    </div>
+                    <p class="text-danger mb-0">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Peringatan:</strong> Tiket yang dibatalkan tidak dapat diaktifkan kembali!
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseCancelModal">Batal</button>
+                    <button type="button" class="btn btn-danger" @onclick="CancelTicket" disabled="@processing">
+                        @if (processing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Ya, Batalkan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Users? currentUser;
+    private bool loading = true;
+    private List<Orders> allOrders = new();
+    private List<Orders> filteredOrders = new();
+    private string searchTerm = string.Empty;
+    private string filterStatus = string.Empty;
+    private DateTime? filterDate;
+    private string? successMessage;
+    private string? errorMessage;
+
+    private bool showCancelModal = false;
+    private bool processing = false;
+    private EntryTickets? ticketToCancel;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
+
+            if (currentUser == null)
+            {
+                Nav.NavigateTo("/login", true);
+                return;
+            }
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Manage orders page init error: {ex}");
+            errorMessage = "Terjadi kesalahan saat memuat data";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        allOrders = await OrderRepo.GetAllAsync() ?? new();
+
+        // Load tickets for each order
+        foreach (var order in allOrders)
+        {
+            var tickets = await TicketRepo.GetAllAsync();
+            order.Tickets = tickets.Where(t => t.OrderId == order.Id).ToList();
+        }
+
+        filteredOrders = allOrders.OrderByDescending(o => o.CreatedAt).ToList();
+    }
+
+    private void FilterOrders()
+    {
+        filteredOrders = allOrders;
+
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            filteredOrders = filteredOrders.Where(o =>
+            o.OrderNo.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (o.User != null && o.User.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+            o.Tickets.Any(t => t.TicketCode.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filterStatus))
+        {
+            filteredOrders = filteredOrders.Where(o =>
+            o.Tickets.Any(t => t.Status == filterStatus)
+            ).ToList();
+        }
+
+        if (filterDate.HasValue)
+        {
+            filteredOrders = filteredOrders.Where(o =>
+            o.Tickets.Any(t => t.VisitDate.Date == filterDate.Value.Date)
+            ).ToList();
+        }
+
+        filteredOrders = filteredOrders.OrderByDescending(o => o.CreatedAt).ToList();
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        filterStatus = string.Empty;
+        filterDate = null;
+        FilterOrders();
+    }
+
+    private async Task CheckInTicket(EntryTickets ticket)
+    {
+        try
+        {
+            ticket.Status = "CheckedIn";
+            ticket.TimeIn = DateTime.Now;
+
+            await TicketRepo.UpdateAsync(ticket);
+            await TicketRepo.SaveChangesAsync();
+
+            successMessage = $"Tiket #{ticket.Id} berhasil di-check in!";
+
+            await LoadData();
+            FilterOrders();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task MarkAsUsed(EntryTickets ticket)
+    {
+        try
+        {
+            ticket.Status = "Used";
+
+            await TicketRepo.UpdateAsync(ticket);
+            await TicketRepo.SaveChangesAsync();
+
+            successMessage = $"Tiket #{ticket.Id} berhasil ditandai selesai!";
+
+            await LoadData();
+            FilterOrders();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void ShowCancelConfirm(EntryTickets ticket)
+    {
+        ticketToCancel = ticket;
+        showCancelModal = true;
+    }
+
+    private void CloseCancelModal()
+    {
+        showCancelModal = false;
+        ticketToCancel = null;
+    }
+
+    private async Task CancelTicket()
+    {
+        if (ticketToCancel == null) return;
+
+        processing = true;
+        errorMessage = null;
+
+        try
+        {
+            ticketToCancel.Status = "Cancelled";
+
+            await TicketRepo.UpdateAsync(ticketToCancel);
+            await TicketRepo.SaveChangesAsync();
+
+            successMessage = $"Tiket #{ticketToCancel.Id} berhasil dibatalkan!";
+
+            await LoadData();
+            FilterOrders();
+            CloseCancelModal();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+}

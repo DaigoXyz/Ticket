@@ -23,12 +23,16 @@ namespace Ticket.Repositories
             =>  _context.EntryTickets
                 .AsNoTracking()
                 .Include(t => t.User)
+                .Include(t => t.TicketProduct)
+                .Include(t => t.Order)
                 .OrderByDescending(x => x.Id)
                 .ToListAsync();
         
         public Task<EntryTickets?> GetByIdAsync(int id)
             => _context.EntryTickets
                 .Include(t => t.User)
+                .Include(t => t.TicketProduct)
+                .Include(t => t.Order)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
         public Task<List<EntryTickets>> GetByVisitDateAsync(DateTime date)
@@ -46,9 +50,18 @@ namespace Ticket.Repositories
             => _context.EntryTickets
                 .AsNoTracking()
                 .Include(t => t.User)
+                .Include(t => t.TicketProduct)
+                .Include(t => t.Order)
                 .Where(x => x.UserId == userId)
                 .OrderByDescending(x => x.Id)
                 .ToListAsync();
+
+        public Task<EntryTickets?> GetByCodeAsync(string ticketCode)
+            => _context.EntryTickets
+                .Include(t => t.User)
+                .Include(t => t.TicketProduct)
+                .Include(t => t.Order)
+                .FirstOrDefaultAsync(x => x.TicketCode == ticketCode);
 
         public async Task AddAsync(EntryTickets ticket)
         {

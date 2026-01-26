@@ -4,6 +4,8 @@
 @inject Blazored.SessionStorage.ISessionStorageService SessionStorage
 @inject IUserRepository UserRepo
 @inject IEntryTicketRepository TicketRepo
+@inject ITicketProductRepository ProductRepo
+@inject IOrderRepository OrderRepo
 @inject Ticket.Services.State.AuthState State
 @using Ticket.Models
 @using Ticket.Repositories.IRepositories
@@ -81,12 +83,12 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-1">Total Tickets</h6>
-                                    <h3 class="mb-0 fw-bold">@_totalTickets</h3>
-                                    <small class="text-info">All time</small>
+                                    <h6 class="text-muted mb-1">Total Orders</h6>
+                                    <h3 class="mb-0 fw-bold">@_totalOrders</h3>
+                                    <small class="text-info">Rp @_totalRevenue.ToString("N0")</small>
                                 </div>
                                 <div class="bg-info bg-opacity-10 p-3 rounded">
-                                    <i class="bi bi-ticket-perforated-fill fs-2 text-info"></i>
+                                    <i class="bi bi-receipt-cutoff fs-2 text-info"></i>
                                 </div>
                             </div>
                         </div>
@@ -98,12 +100,12 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="text-muted mb-1">Booked Tickets</h6>
-                                    <h3 class="mb-0 fw-bold">@_bookedTickets</h3>
-                                    <small class="text-warning">Pending check-in</small>
+                                    <h6 class="text-muted mb-1">Total Tickets</h6>
+                                    <h3 class="mb-0 fw-bold">@_totalTickets</h3>
+                                    <small class="text-warning">@_issuedTickets Issued</small>
                                 </div>
                                 <div class="bg-warning bg-opacity-10 p-3 rounded">
-                                    <i class="bi bi-calendar-check-fill fs-2 text-warning"></i>
+                                    <i class="bi bi-ticket-perforated-fill fs-2 text-warning"></i>
                                 </div>
                             </div>
                         </div>
@@ -123,6 +125,35 @@
                                     <i class="bi bi-door-open-fill fs-2 text-success"></i>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="mb-3"><i class="bi bi-lightning-fill"></i> Quick Actions</h6>
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <a href="/admin/orders" class="btn btn-outline-primary w-100">
+                                <i class="bi bi-receipt"></i> Manage Orders
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="/admin/tickets" class="btn btn-outline-info w-100">
+                                <i class="bi bi-ticket-perforated"></i> Manage Tickets
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="/admin/ticket-products" class="btn btn-outline-success w-100">
+                                <i class="bi bi-box"></i> Manage Products
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="/admin/users" class="btn btn-outline-warning w-100">
+                                <i class="bi bi-people"></i> Manage Users
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -153,10 +184,71 @@
                 </div>
             </div>
 
+            <!-- Recent Orders -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Recent Orders</h5>
+                        <a href="/admin/orders" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (_recentOrders.Count == 0)
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+                            <p class="text-muted mt-2">No orders found</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Order No</th>
+                                        <th>Customer</th>
+                                        <th>Total Amount</th>
+                                        <th>Tickets</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var order in _recentOrders)
+                                    {
+                                        <tr>
+                                            <td><code>@order.OrderNo</code></td>
+                                            <td>@order.User?.Name</td>
+                                            <td><strong class="text-success">Rp @order.TotalAmount.ToString("N0")</strong></td>
+                                            <td>@order.Tickets.Count tiket</td>
+                                            <td>
+                                                @if (order.Status == "Paid")
+                                                {
+                                                    <span class="badge bg-success">Paid</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning">@order.Status</span>
+                                                }
+                                            </td>
+                                            <td>@order.CreatedAt.ToString("dd/MM HH:mm")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
             <!-- Recent Tickets Table -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">Recent Tickets</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Recent Tickets</h5>
+                        <a href="/admin/tickets" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
                 </div>
                 <div class="card-body">
                     @if (_recentTickets.Count == 0)
@@ -173,10 +265,11 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Visitor</th>
+                                        <th>Product</th>
                                         <th>Visit Date</th>
                                         <th>Purpose</th>
                                         <th>Status</th>
-                                        <th>Check-In Time</th>
+                                        <th>Check-In</th>
                                         <th>Created</th>
                                     </tr>
                                 </thead>
@@ -185,16 +278,22 @@
                                     {
                                         <tr>
                                             <td>@t.User?.Name</td>
+                                            <td><strong>@t.TicketProduct?.Name</strong></td>
                                             <td>@t.VisitDate.ToString("dd MMM yyyy")</td>
-                                            <td>@(string.IsNullOrEmpty(t.Purpose) ? "-" : t.Purpose)</td>
+                                            <td>@(string.IsNullOrEmpty(t.Purpose) ? "-" : (t.Purpose.Length > 30 ?
+                                                                                t.Purpose.Substring(0, 30) + "..." : t.Purpose))</td>
                                             <td>
-                                                @if (t.Status == "Booked")
+                                                @if (t.Status == "Issued")
                                                 {
-                                                    <span class="badge bg-warning">Booked</span>
+                                                    <span class="badge bg-success">Issued</span>
                                                 }
                                                 else if (t.Status == "CheckedIn")
                                                 {
-                                                    <span class="badge bg-success">Checked In</span>
+                                                    <span class="badge bg-info">Checked In</span>
+                                                }
+                                                else if (t.Status == "Used")
+                                                {
+                                                    <span class="badge bg-secondary">Used</span>
                                                 }
                                                 else if (t.Status == "Cancelled")
                                                 {
@@ -228,7 +327,10 @@
             <!-- User Statistics -->
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">User Overview</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">User Overview</h5>
+                        <a href="/admin/users" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -241,11 +343,12 @@
                                     <th>Role</th>
                                     <th>Status</th>
                                     <th>Total Tickets</th>
+                                    <th>Total Spent</th>
                                     <th>Joined</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var user in _users)
+                                @foreach (var user in _users.Take(10))
                                 {
                                     <tr>
                                         <td><strong>@user.Id</strong></td>
@@ -272,6 +375,7 @@
                                             }
                                         </td>
                                         <td>@_userTicketCounts.GetValueOrDefault(user.Id, 0)</td>
+                                        <td>Rp @_userSpent.GetValueOrDefault(user.Id, 0).ToString("N0")</td>
                                         <td>@user.CreatedAt.ToString("dd MMM yyyy")</td>
                                     </tr>
                                 }
@@ -296,14 +400,18 @@
     // Statistics
     private int _totalUsers = 0;
     private int _activeUsers = 0;
+    private int _totalOrders = 0;
+    private decimal _totalRevenue = 0;
     private int _totalTickets = 0;
-    private int _bookedTickets = 0;
+    private int _issuedTickets = 0;
     private int _checkedInTickets = 0;
     private int _todayCheckIns = 0;
 
+    private List<Orders> _recentOrders = new();
     private List<EntryTickets> _recentTickets = new();
     private List<Users> _users = new();
     private Dictionary<int, int> _userTicketCounts = new();
+    private Dictionary<int, decimal> _userSpent = new();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -355,28 +463,47 @@
             _totalUsers = _users.Count;
             _activeUsers = _users.Count(u => u.IsActive);
 
-            // Load tickets
-            var tickets = await TicketRepo.GetAllAsync() ?? new();
-            _totalTickets = tickets.Count;
-            _bookedTickets = tickets.Count(t => t.Status == "Booked");
-            _checkedInTickets = tickets.Count(t => t.Status == "CheckedIn");
-            _todayCheckIns = tickets.Count(t => t.TimeIn.HasValue && t.TimeIn.Value.Date == DateTime.Now.Date);
+            // Load orders
+            var orders = await OrderRepo.GetAllAsync() ?? new();
+            _totalOrders = orders.Count;
+            _totalRevenue = orders.Where(o => o.Status == "Paid").Sum(o => o.TotalAmount);
+            _recentOrders = orders.OrderByDescending(o => o.CreatedAt).Take(5).ToList();
 
-            _recentTickets = tickets
+            // Load tickets for each order
+            foreach (var order in _recentOrders)
+            {
+                var tickets = await TicketRepo.GetAllAsync();
+                order.Tickets = tickets.Where(t => t.OrderId == order.Id).ToList();
+            }
+
+            // Load tickets
+            var allTickets = await TicketRepo.GetAllAsync() ?? new();
+            _totalTickets = allTickets.Count;
+            _issuedTickets = allTickets.Count(t => t.Status == "Issued");
+            _checkedInTickets = allTickets.Count(t => t.Status == "CheckedIn");
+            _todayCheckIns = allTickets.Count(t => t.TimeIn.HasValue && t.TimeIn.Value.Date == DateTime.Now.Date);
+
+            _recentTickets = allTickets
             .OrderByDescending(t => t.CreatedAt)
             .Take(10)
             .ToList();
 
             // Count tickets per user
-            _userTicketCounts = tickets
+            _userTicketCounts = allTickets
             .GroupBy(t => t.UserId)
             .ToDictionary(g => g.Key, g => g.Count());
+
+            // Calculate spending per user
+            _userSpent = orders
+            .Where(o => o.Status == "Paid")
+            .GroupBy(o => o.UserId)
+            .ToDictionary(g => g.Key, g => g.Sum(o => o.TotalAmount));
 
             _loading = false;
             StateHasChanged();
 
             // Render charts after data is loaded
-            await RenderCharts(tickets);
+            await RenderCharts(allTickets);
         }
         catch (Exception ex)
         {
@@ -388,9 +515,8 @@
 
     private async Task RenderCharts(List<EntryTickets> tickets)
     {
-        await Task.Delay(100); // Wait for DOM to be ready
+        await Task.Delay(100);
 
-        // Prepare data for last 7 days trend
         var last7Days = Enumerable.Range(0, 7)
         .Select(i => DateTime.Now.Date.AddDays(-6 + i))
         .ToList();
@@ -401,24 +527,23 @@
             Count = tickets.Count(t => t.CreatedAt.Date == date)
         }).ToList();
 
-        // Prepare status pie chart data
         var statusData = new
         {
-            Booked = tickets.Count(t => t.Status == "Booked"),
+            Issued = tickets.Count(t => t.Status == "Issued"),
             CheckedIn = tickets.Count(t => t.Status == "CheckedIn"),
+            Used = tickets.Count(t => t.Status == "Used"),
             Cancelled = tickets.Count(t => t.Status == "Cancelled")
         };
 
-        // Render Trend Chart
         await JSRuntime.InvokeVoidAsync("renderTrendChart",
         trendData.Select(d => d.Date).ToArray(),
         trendData.Select(d => d.Count).ToArray()
         );
 
-        // Render Pie Chart
         await JSRuntime.InvokeVoidAsync("renderPieChart",
-        statusData.Booked,
+        statusData.Issued,
         statusData.CheckedIn,
+        statusData.Used,
         statusData.Cancelled
         );
     }
@@ -470,7 +595,7 @@
         });
     };
 
-    window.renderPieChart = function (booked, checkedIn, cancelled) {
+    window.renderPieChart = function (issued, checkedIn, used, cancelled) {
         const ctx = document.getElementById('statusPieChart');
         if (!ctx) return;
 
@@ -479,12 +604,13 @@
         pieChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Booked', 'Checked In', 'Cancelled'],
+                labels: ['Issued', 'Checked In', 'Used', 'Cancelled'],
                 datasets: [{
-                    data: [booked, checkedIn, cancelled],
+                    data: [issued, checkedIn, used, cancelled],
                     backgroundColor: [
-                        'rgb(255, 193, 7)',
                         'rgb(25, 135, 84)',
+                        'rgb(13, 202, 240)',
+                        'rgb(108, 117, 125)',
                         'rgb(220, 53, 69)'
                     ],
                     borderWidth: 0

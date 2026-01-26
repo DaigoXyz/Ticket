@@ -30,6 +30,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBZG1pblxBZG1pbi5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/BentangTest/Ticket/Components/Pages/Admin/OrderManage.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBZG1pblxPcmRlck1hbmFnZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/BentangTest/Ticket/Components/Pages/Admin/TicketManage.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBZG1pblxUaWNrZXRNYW5hZ2UucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
@@ -72,6 +76,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/BentangTest/Ticket/Components/Pages/UserTicketPage/Detail.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xVc2VyVGlja2V0UGFnZVxEZXRhaWwucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/BentangTest/Ticket/Components/Pages/UserTicketPage/MyTicket.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xVc2VyVGlja2V0UGFnZVxNeVRpY2tldC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/BentangTest/Ticket/Components/Pages/UserTicketPage/Tickets.razor]

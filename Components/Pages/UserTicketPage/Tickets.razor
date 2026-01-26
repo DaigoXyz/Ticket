@@ -1,39 +1,33 @@
 @page "/tickets"
 @rendermode InteractiveServer
 @inject Blazored.SessionStorage.ISessionStorageService SessionStorage
-@inject Ticket.Repositories.IRepositories.IEntryTicketRepository TicketRepo
+@inject ITicketProductRepository ProductRepo
 @inject NavigationManager Nav
 @using Ticket.Models
+@using Ticket.Repositories.IRepositories
 
 <div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col">
-            <h2>Tiket Saya</h2>
-            <p class="text-muted">Kelola semua tiket kunjungan Anda</p>
-        </div>
-        <div class="col-auto">
-            <a href="/tickets/create" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Buat Tiket Baru
-            </a>
-        </div>
+    <!-- Header Section -->
+    <div class="text-center mb-5">
+        <h1 class="display-5 fw-bold">Wujudkan Impian Anda Berpergian</h1>
+        <p class="lead text-muted">Pilih tiket terbaik untuk pengalaman tak terlupakan</p>
     </div>
 
-    <div class="card shadow-sm mb-3">
-        <div class="card-body">
-            <div class="row g-2">
-                <div class="col-md-4">
-                    <input type="text" class="form-control" placeholder="Cari tiket..." @bind="searchTerm"
-                        @bind:event="oninput" @onkeyup="FilterTickets" />
-                </div>
-                <div class="col-md-3">
-                    <select class="form-select" @bind="filterStatus" @bind:after="FilterTickets">
-                        <option value="">Semua Status</option>
-                        <option value="Booked">Booked</option>
-                        <option value="CheckedIn">Checked In</option>
-                        <option value="Cancelled">Cancelled</option>
-                    </select>
-                </div>
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text bg-white">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" class="form-control border-start-0" placeholder="Cari tiket..." @bind="searchTerm"
+                    @bind:event="oninput" @onkeyup="FilterProducts" />
             </div>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="/my-tickets" class="btn btn-outline-primary">
+                <i class="bi bi-ticket-perforated"></i> Tiket Saya
+            </a>
         </div>
     </div>
 
@@ -43,115 +37,152 @@
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
+            <p class="text-muted mt-3">Memuat produk tiket...</p>
         </div>
     }
     else
     {
-        <div class="card shadow-sm">
-            <div class="card-body">
-                @if (filteredTickets.Any())
+        @if (!filteredProducts.Any())
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <h4 class="text-muted mt-3">
+                    @if (!string.IsNullOrEmpty(searchTerm))
+                    {
+                        <span>Tidak ada tiket yang sesuai pencarian</span>
+                    }
+                    else
+                    {
+                        <span>Belum ada tiket tersedia</span>
+                    }
+                </h4>
+                <p class="text-muted">Silakan cek kembali nanti</p>
+            </div>
+        }
+        else
+        {
+            <!-- Product Grid -->
+            <div class="row g-4">
+                @foreach (var product in filteredProducts)
                 {
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Tanggal Kunjungan</th>
-                                    <th>Keperluan</th>
-                                    <th>Status</th>
-                                    <th>Waktu Masuk</th>
-                                    <th>Dibuat</th>
-                                    <th>Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var ticket in filteredTickets)
-                                {
-                                    <tr>
-                                        <td>@ticket.VisitDate.ToString("dd MMM yyyy")</td>
-                                        <td>@(string.IsNullOrEmpty(ticket.Purpose) ? "-" : ticket.Purpose)</td>
-                                        <td>
-                                            @if (ticket.Status == "Booked")
-                                            {
-                                                <span class="badge bg-success">Booked</span>
-                                            }
-                                            else if (ticket.Status == "CheckedIn")
-                                            {
-                                                <span class="badge bg-info">Checked In</span>
-                                            }
-                                            else if (ticket.Status == "Cancelled")
-                                            {
-                                                <span class="badge bg-danger">Cancelled</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-secondary">@ticket.Status</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            @if (ticket.TimeIn.HasValue)
-                                            {
-                                                @ticket.TimeIn.Value.ToString("HH:mm")
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted">-</span>
-                                            }
-                                        </td>
-                                        <td>@ticket.CreatedAt.ToString("dd MMM yyyy")</td>
-                                        <td>
-                                            <a href="/tickets/@ticket.Id" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i> Detail
-                                            </a>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 shadow-sm ticket-card">
+                            <div class="card-body d-flex flex-column">
+                                <!-- Badge -->
+                                <div class="mb-3">
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-ticket-perforated-fill"></i> Tersedia
+                                    </span>
+                                </div>
 
-                    <div class="mt-3">
-                        <p class="text-muted mb-0">
-                            Menampilkan @filteredTickets.Count dari @allTickets.Count tiket
-                        </p>
-                    </div>
-                }
-                else
-                {
-                    <div class="text-center py-5">
-                        <i class="bi bi-inbox fs-1 text-muted"></i>
-                        <p class="text-muted mt-2 mb-3">
-                            @if (!string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(filterStatus))
-                            {
-                                <span>Tidak ada tiket yang sesuai filter</span>
-                            }
-                            else
-                            {
-                                <span>Anda belum memiliki tiket</span>
-                            }
-                        </p>
-                        @if (string.IsNullOrEmpty(searchTerm) && string.IsNullOrEmpty(filterStatus))
-                        {
-                            <a href="/tickets/create" class="btn btn-primary">Buat Tiket Pertama</a>
-                        }
+                                <!-- Product Name -->
+                                <h5 class="card-title fw-bold mb-3">@product.Name</h5>
+
+                                <!-- Description -->
+                                @if (!string.IsNullOrEmpty(product.Description))
+                                {
+                                    <p class="card-text text-muted small mb-3">
+                                        @product.Description
+                                    </p>
+                                }
+                                else
+                                {
+                                    <p class="card-text text-muted small mb-3">
+                                        <em>Tiket premium untuk pengalaman terbaik</em>
+                                    </p>
+                                }
+
+                                <!-- Spacer -->
+                                <div class="mt-auto">
+                                    <!-- Price -->
+                                    <div class="d-flex align-items-baseline mb-3">
+                                        <h3 class="text-success fw-bold mb-0">
+                                            Rp @product.Price.ToString("N0")
+                                        </h3>
+                                        <span class="text-muted ms-2">/tiket</span>
+                                    </div>
+
+                                    <!-- Features List -->
+                                    <ul class="list-unstyled small mb-3">
+                                        <li class="mb-1">
+                                            <i class="bi bi-check-circle-fill text-success"></i>
+                                            Berlaku untuk 1 orang
+                                        </li>
+                                        <li class="mb-1">
+                                            <i class="bi bi-check-circle-fill text-success"></i>
+                                            Pilih tanggal kunjungan
+                                        </li>
+                                        <li class="mb-1">
+                                            <i class="bi bi-check-circle-fill text-success"></i>
+                                            E-ticket digital
+                                        </li>
+                                    </ul>
+
+                                    <!-- CTA Button -->
+                                    <button class="btn btn-primary w-100" @onclick="() => BuyTicket(product.Id)">
+                                        <i class="bi bi-cart-plus"></i> Beli Sekarang
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 }
             </div>
-        </div>
+
+            <!-- Results Info -->
+            <div class="mt-4 text-center">
+                <p class="text-muted">
+                    Menampilkan @filteredProducts.Count dari @allProducts.Count tiket tersedia
+                </p>
+            </div>
+        }
     }
+
+    <!-- Info Section -->
+    <div class="row mt-5 pt-4 border-top">
+        <div class="col-md-4 text-center mb-4">
+            <i class="bi bi-shield-check fs-1 text-primary"></i>
+            <h5 class="mt-3">Aman & Terpercaya</h5>
+            <p class="text-muted small">Transaksi dijamin aman dengan sistem yang terpercaya</p>
+        </div>
+        <div class="col-md-4 text-center mb-4">
+            <i class="bi bi-lightning-charge fs-1 text-primary"></i>
+            <h5 class="mt-3">Instan</h5>
+            <p class="text-muted small">E-ticket langsung dikirim setelah pembayaran</p>
+        </div>
+        <div class="col-md-4 text-center mb-4">
+            <i class="bi bi-headset fs-1 text-primary"></i>
+            <h5 class="mt-3">Support 24/7</h5>
+            <p class="text-muted small">Tim support siap membantu kapan saja</p>
+        </div>
+    </div>
 </div>
+
+<style>
+    .ticket-card {
+        transition: all 0.3s ease;
+        border: 1px solid #e0e0e0;
+    }
+
+    .ticket-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+        border-color: var(--bs-primary);
+    }
+</style>
 
 @code {
     private Users? currentUser;
     private bool loading = true;
-    private List<EntryTickets> allTickets = new();
-    private List<EntryTickets> filteredTickets = new();
+    private List<TicketProducts> allProducts = new();
+    private List<TicketProducts> filteredProducts = new();
     private string searchTerm = string.Empty;
-    private string filterStatus = string.Empty;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
+
         loading = true;
         StateHasChanged();
 
@@ -165,12 +196,11 @@
                 return;
             }
 
-            await LoadTickets();
+            await LoadProducts();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Tickets page init error: {ex}");
-            // optional: tampilkan error message di UI
+            Console.WriteLine($"Tickets catalog page init error: {ex}");
         }
         finally
         {
@@ -179,30 +209,28 @@
         }
     }
 
-    private async Task LoadTickets()
+    private async Task LoadProducts()
     {
-        if (currentUser != null)
-        {
-            allTickets = await TicketRepo.GetByUserIdAsync(currentUser.Id);
-            filteredTickets = allTickets;
-        }
+        // Hanya load produk yang aktif
+        allProducts = await ProductRepo.GetActiveAsync();
+        filteredProducts = allProducts;
     }
 
-    private void FilterTickets()
+    private void FilterProducts()
     {
-        filteredTickets = allTickets;
+        filteredProducts = allProducts;
 
         if (!string.IsNullOrEmpty(searchTerm))
         {
-            filteredTickets = filteredTickets.Where(t =>
-            t.Id.ToString().Contains(searchTerm) ||
-            (t.Purpose != null && t.Purpose.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            filteredProducts = filteredProducts.Where(p =>
+            p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (p.Description != null && p.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
             ).ToList();
         }
+    }
 
-        if (!string.IsNullOrEmpty(filterStatus))
-        {
-            filteredTickets = filteredTickets.Where(t => t.Status == filterStatus).ToList();
-        }
+    private void BuyTicket(int productId)
+    {
+        Nav.NavigateTo($"/tickets/buy/{productId}");
     }
 }

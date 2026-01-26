@@ -1,0 +1,384 @@
+@page "/my-tickets"
+@rendermode InteractiveServer
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+@inject IEntryTicketRepository TicketRepo
+@inject IOrderRepository OrderRepo
+@inject NavigationManager Nav
+@using Ticket.Models
+@using Ticket.Repositories.IRepositories
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-ticket-perforated"></i> Tiket Saya</h2>
+            <p class="text-muted">Kelola dan lihat semua tiket yang sudah dibeli</p>
+        </div>
+        <div class="col-auto">
+            <a href="/tickets" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Beli Tiket Baru
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter & Search -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" placeholder="Cari tiket..." @bind="searchTerm"
+                        @bind:event="oninput" @onkeyup="FilterTickets" />
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" @bind="filterStatus" @bind:after="FilterTickets">
+                        <option value="">Semua Status</option>
+                        <option value="Issued">Issued</option>
+                        <option value="CheckedIn">Checked In</option>
+                        <option value="Used">Used</option>
+                        <option value="Expired">Expired</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <input type="date" class="form-control" @bind="filterDate" @bind:after="FilterTickets" />
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary"></div>
+            <p class="text-muted mt-3">Memuat tiket Anda...</p>
+        </div>
+    }
+    else
+    {
+        @if (!filteredTickets.Any())
+        {
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                    <h4 class="text-muted mt-3">
+                        @if (!string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(filterStatus) || filterDate.HasValue)
+                        {
+                            <span>Tidak ada tiket yang sesuai filter</span>
+                        }
+                        else
+                        {
+                            <span>Anda belum memiliki tiket</span>
+                        }
+                    </h4>
+                    @if (string.IsNullOrEmpty(searchTerm) && string.IsNullOrEmpty(filterStatus) && !filterDate.HasValue)
+                    {
+                        <p class="text-muted">Mulai petualangan Anda dengan membeli tiket sekarang!</p>
+                        <a href="/tickets" class="btn btn-primary mt-2">
+                            <i class="bi bi-cart-plus"></i> Beli Tiket
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Tickets Grid -->
+            <div class="row g-4">
+                @foreach (var ticket in filteredTickets)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 shadow-sm ticket-card">
+                            <div class="card-body">
+                                <!-- Status Badge -->
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <span class="badge @GetStatusBadgeClass(ticket.Status)">
+                                        @ticket.Status
+                                    </span>
+                                    <small class="text-muted">#@ticket.TicketCode[..8]</small>
+                                </div>
+
+                                <!-- Product Name -->
+                                <h5 class="card-title fw-bold">@ticket.TicketProduct?.Name</h5>
+
+                                <!-- Details -->
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-calendar-event text-primary me-2"></i>
+                                        <small>
+                                            <strong>Tanggal:</strong> @ticket.VisitDate.ToString("dd MMM yyyy")
+                                        </small>
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(ticket.Purpose))
+                                    {
+                                        <div class="d-flex align-items-start mb-2">
+                                            <i class="bi bi-chat-left-text text-primary me-2 mt-1"></i>
+                                            <small>
+                                                <strong>Keperluan:</strong>
+                                                <br />@ticket.Purpose
+                                            </small>
+                                        </div>
+                                    }
+
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-tag text-primary me-2"></i>
+                                        <small>
+                                            <strong>Harga:</strong> Rp @ticket.Price.ToString("N0")
+                                        </small>
+                                    </div>
+
+                                    @if (ticket.TimeIn.HasValue)
+                                    {
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="bi bi-clock text-success me-2"></i>
+                                            <small>
+                                                <strong>Check-in:</strong> @ticket.TimeIn.Value.ToString("dd MMM yyyy HH:mm")
+                                            </small>
+                                        </div>
+                                    }
+
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-receipt text-primary me-2"></i>
+                                        <small>
+                                            <strong>Order:</strong> @ticket.Order?.OrderNo
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ShowTicketDetail(ticket)">
+                                        <i class="bi bi-eye"></i> Lihat Detail
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-light small text-muted">
+                                <i class="bi bi-clock-history"></i>
+                                Dibeli: @ticket.CreatedAt.ToString("dd MMM yyyy HH:mm")
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Results Info -->
+            <div class="mt-4 text-center">
+                <p class="text-muted">
+                    Menampilkan @filteredTickets.Count dari @allTickets.Count tiket
+                </p>
+            </div>
+        }
+    }
+</div>
+
+<!-- Ticket Detail Modal -->
+@if (showDetailModal && selectedTicket != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-ticket-detailed"></i> Detail Tiket
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseDetailModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-3">Informasi Tiket</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td class="text-muted">Kode Tiket</td>
+                                    <td><code>@selectedTicket.TicketCode</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Produk</td>
+                                    <td><strong>@selectedTicket.TicketProduct?.Name</strong></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Status</td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(selectedTicket.Status)">
+                                            @selectedTicket.Status
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Tanggal Kunjungan</td>
+                                    <td>@selectedTicket.VisitDate.ToString("dd MMMM yyyy")</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Harga</td>
+                                    <td><strong>Rp @selectedTicket.Price.ToString("N0")</strong></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-3">Informasi Pemesanan</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td class="text-muted">Nomor Order</td>
+                                    <td><code>@selectedTicket.Order?.OrderNo</code></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Tanggal Beli</td>
+                                    <td>@selectedTicket.CreatedAt.ToString("dd MMMM yyyy HH:mm")</td>
+                                </tr>
+                                @if (selectedTicket.TimeIn.HasValue)
+                                {
+                                    <tr>
+                                        <td class="text-muted">Waktu Check-in</td>
+                                        <td>@selectedTicket.TimeIn.Value.ToString("dd MMMM yyyy HH:mm")</td>
+                                    </tr>
+                                }
+                            </table>
+
+                            @if (!string.IsNullOrEmpty(selectedTicket.Purpose))
+                            {
+                                <h6 class="fw-bold mb-2 mt-3">Keperluan</h6>
+                                <p class="small">@selectedTicket.Purpose</p>
+                            }
+                        </div>
+                    </div>
+
+                    @* <div class="text-center mt-4 p-4 bg-light rounded">
+                        <i class="bi bi-qr-code fs-1 text-muted"></i>
+                        <p class="text-muted mb-0 mt-2">QR Code untuk check-in</p>
+                        <small class="text-muted">Tunjukkan kode ini saat check-in</small>
+                    </div> *@
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDetailModal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .ticket-card {
+        transition: all 0.3s ease;
+        border: 1px solid #e0e0e0;
+    }
+
+    .ticket-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+        border-color: var(--bs-primary);
+    }
+</style>
+
+@code {
+    private Users? currentUser;
+    private bool loading = true;
+    private List<EntryTickets> allTickets = new();
+    private List<EntryTickets> filteredTickets = new();
+    private string searchTerm = string.Empty;
+    private string filterStatus = string.Empty;
+    private DateTime? filterDate;
+
+    private bool showDetailModal = false;
+    private EntryTickets? selectedTicket;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        loading = true;
+        StateHasChanged();
+
+        try
+        {
+            currentUser = await SessionStorage.GetItemAsync<Users>("currentUser");
+
+            if (currentUser == null)
+            {
+                Nav.NavigateTo("/login", true);
+                return;
+            }
+
+            await LoadTickets();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"My tickets page init error: {ex}");
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTickets()
+    {
+        if (currentUser != null)
+        {
+            allTickets = await TicketRepo.GetByUserIdAsync(currentUser.Id);
+            filteredTickets = allTickets;
+        }
+    }
+
+    private void FilterTickets()
+    {
+        filteredTickets = allTickets;
+
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            filteredTickets = filteredTickets.Where(t =>
+            t.TicketCode.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (t.TicketProduct != null && t.TicketProduct.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+            (t.Purpose != null && t.Purpose.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+            (t.Order != null && t.Order.OrderNo.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filterStatus))
+        {
+            filteredTickets = filteredTickets.Where(t => t.Status == filterStatus).ToList();
+        }
+
+        if (filterDate.HasValue)
+        {
+            filteredTickets = filteredTickets.Where(t => t.VisitDate.Date == filterDate.Value.Date).ToList();
+        }
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        filterStatus = string.Empty;
+        filterDate = null;
+        FilterTickets();
+    }
+
+    private void ShowTicketDetail(EntryTickets ticket)
+    {
+        selectedTicket = ticket;
+        showDetailModal = true;
+    }
+
+    private void CloseDetailModal()
+    {
+        showDetailModal = false;
+        selectedTicket = null;
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Issued" => "bg-success",
+            "CheckedIn" => "bg-info",
+            "Used" => "bg-secondary",
+            "Expired" => "bg-warning",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}
