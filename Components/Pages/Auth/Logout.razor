@@ -51,18 +51,14 @@ else if (!string.IsNullOrEmpty(_error))
 
         try
         {
-            // 1. Clear session storage
             await SessionStorage.RemoveItemAsync("currentUser");
             Console.WriteLine("✅ SessionStorage cleared");
 
-            // 2. Clear AuthState
             State.Logout();
             Console.WriteLine("✅ AuthState cleared");
 
-            // 3. Small delay for UX
             await Task.Delay(1000);
 
-            // 4. Redirect to login
             Console.WriteLine("🔄 Redirecting to login...");
             Nav.NavigateTo("/login", forceLoad: true);
         }
